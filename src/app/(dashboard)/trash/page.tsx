@@ -274,10 +274,10 @@ export default function TrashPage() {
           </div>
         </div>
 
-        {/* 分类筛选 — 复刻知识库 */}
+          {/* 分类筛选 — 复刻知识库 */}
         <div className="mb-4">
           <CategoryFilterPills
-            activeCat={catFilter}
+            active={catFilter}
             onChange={(cat) => setCatFilter(cat)}
           />
         </div>

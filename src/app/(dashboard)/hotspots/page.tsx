@@ -231,10 +231,11 @@ export default function HotArticlesPage() {
           </button>
         </div>
 
-        {/* 筛选栏 — 分类 pill + 来源下拉 */}
+        {/* 筛选栏 — 栏目 pill + 来源下拉 */}
         <div className="flex items-center gap-2 flex-wrap">
           <CategoryFilterPills
-            activeCat={activeCol}
+            active={activeCol}
+            items={cols.length ? cols : allCats}
             onChange={(cat) => setActiveCol(cat)}
           />
           <span className="text-[10px] text-gray-300">|</span>

@@ -369,7 +369,7 @@ export default function DocumentsPage() {
 
           {/* 分类筛选 — 改为 pill 样式（公文类型联动机制不变） */}
           <CategoryFilterPills
-            activeCat={catFilter}
+            active={catFilter}
             onChange={(cat) => setCatFilter(cat)}
           />
 

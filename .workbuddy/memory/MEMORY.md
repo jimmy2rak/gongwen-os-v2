@@ -37,3 +37,21 @@
 ## 构建/验证约束
 - ⚠️ 沙箱"安全删除"保护会拦截 `next build`（清理 .next 触发 SAFE_DELETE_BULK_CONFIRM_REQUIRED）。验证改用 `tsc --noEmit`（类型）+ dev 服务器热重载路由注册（未登录 307→/login 证明路由已注册且鉴权生效）。
 - 路径注意：本目录是 `开发者`（中文），曾误写为 `developer` 导致文件落到错误目录，已纠正。
+
+## UI 组件约定（2026-07-08 新增）
+
+### CategoryFilterPills 分类筛选组件
+- 路径：`src/components/ui/CategoryFilterPills.tsx`
+- 复用知识库的圆角 pill 样式，已应用于：热点推送、文档管理、回收站
+- 激活时背景色 = 分类色（内联 `style.backgroundColor`），"全部"按钮用 `#163f3a`
+- 不使用时（未选中）显示 `bg-gray-100 text-gray-500 hover:bg-gray-200`
+
+### 主题切换系统
+- localStorage key: `gw-theme-mode`，值: `"light" | "dark" | "auto"`
+- layout.tsx 内联脚本优先读 localStorage → fallback 到 `prefers-color-scheme`
+- Topbar 中通过 `Sun`/`Moon`/`Monitor` 图标显示当前模式
+- 下拉菜单三个选项均带图标+文字：🌞明亮 / 🌙黑暗 / 💻自动
+
+### 黑暗模式 CSS 策略
+- 全局覆盖在 `globals.css` 的 `.dark` 块中，用 `!important` 覆盖硬编码 Tailwind 类
+- 模板管理、预览弹窗的专用覆盖放在 `globals.css` 末尾
