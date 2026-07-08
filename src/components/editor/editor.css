@@ -1,0 +1,361 @@
+/* ─── 公文编辑器样式 ──────────────────────────────
+   三种模式：simple（简易）、gb（国标）、official（红头）
+   核心规则遵循 GB/T 9704-2012 */
+
+/* ===== 通用 ===== */
+.document-editor {
+  font-family: "Times New Roman", "Times New Roman PS", serif;
+  color: #000;
+}
+
+.document-editor .ProseMirror {
+  outline: none;
+  min-height: 600px;
+}
+
+/* 全局重置段落/标题默认外边距 —— 消除 TipTap 内置 block 边距 */
+.document-editor .ProseMirror p,
+.document-editor .ProseMirror h1,
+.document-editor .ProseMirror h2,
+.document-editor .ProseMirror h3,
+.document-editor .ProseMirror h4,
+.document-editor .ProseMirror h5,
+.document-editor .ProseMirror blockquote,
+.document-editor .ProseMirror pre,
+.document-editor .ProseMirror ul,
+.document-editor .ProseMirror ol,
+.document-editor .ProseMirror li {
+  margin-block-start: 0 !important;
+  margin-block-end: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.document-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #adb5bd;
+  pointer-events: none;
+  height: 0;
+}
+
+/* ===== A4 纸面 ===== */
+.document-page {
+  background: white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  box-sizing: border-box;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* ================================================================
+   简易模式（simple）— 默认，尽量接近国标但排版更宽松
+   ================================================================ */
+.doc-mode-simple .document-page {
+  /* 网页预览：紧凑排版，便于编辑 */
+  padding: 1.5cm 1.2cm 1.5cm 1.2cm;
+}
+
+.doc-mode-simple .document-editor .ProseMirror p {
+  font-family: "Times New Roman", "仿宋_GB2312", "仿宋", "FangSong", serif;
+  font-size: 16pt;
+  line-height: 28pt;
+  margin: 0;
+  padding: 0;
+  text-indent: 2em;
+  text-align: justify;
+}
+
+/* ===== 公文标题（题）—— 方正小标宋简体、居中、28pt ===== */
+.doc-mode-simple .document-editor .ProseMirror .doc-title,
+.doc-mode-gb .document-editor .ProseMirror .doc-title,
+.doc-mode-official .document-editor .ProseMirror .doc-title {
+  font-family: "Times New Roman", "方正小标宋简体", "FZXiaoBiaoSong-B05S", serif;
+  font-size: 22pt;
+  font-weight: bold;
+  text-align: center;
+  line-height: 32pt;
+  margin: 0.5em 0;
+  padding: 0;
+}
+
+.doc-mode-simple .document-editor .ProseMirror h1,
+.doc-mode-gb .document-editor .ProseMirror h1,
+.doc-mode-official .document-editor .ProseMirror h1 {
+  font-family: "Times New Roman", "黑体", "SimHei", serif;
+  font-size: 16pt;
+  font-weight: bold;
+  line-height: 28pt;
+  margin: 0.5em 0 0.25em 0;
+  text-indent: 2em;
+}
+
+.doc-mode-simple .document-editor .ProseMirror h2,
+.doc-mode-gb .document-editor .ProseMirror h2,
+.doc-mode-official .document-editor .ProseMirror h2 {
+  font-family: "Times New Roman", "楷体_GB2312", "楷体", "KaiTi", serif;
+  font-size: 16pt;
+  line-height: 28pt;
+  margin: 0.25em 0;
+  text-indent: 2em;
+}
+
+.doc-mode-simple .document-editor .ProseMirror h3,
+.doc-mode-gb .document-editor .ProseMirror h3,
+.doc-mode-official .document-editor .ProseMirror h3 {
+  font-family: "Times New Roman", "仿宋_GB2312", "仿宋", "FangSong", serif;
+  font-size: 16pt;
+  font-weight: bold;
+  line-height: 28pt;
+  margin: 0.25em 0;
+  text-indent: 2em;
+}
+
+.doc-mode-simple .document-editor .ProseMirror h4,
+.doc-mode-gb .document-editor .ProseMirror h4,
+.doc-mode-official .document-editor .ProseMirror h4 {
+  font-family: "Times New Roman", "仿宋_GB2312", "仿宋", "FangSong", serif;
+  font-size: 16pt;
+  font-weight: bold;
+  line-height: 28pt;
+  margin: 0.25em 0;
+  text-indent: 2em;
+}
+
+.doc-mode-simple .document-editor .ProseMirror h5,
+.doc-mode-gb .document-editor .ProseMirror h5,
+.doc-mode-official .document-editor .ProseMirror h5 {
+  font-family: "Times New Roman", "仿宋_GB2312", "仿宋", "FangSong", serif;
+  font-size: 16pt;
+  line-height: 28pt;
+  margin: 0.25em 0;
+  text-indent: 2em;
+}
+
+/* ===== 表格 ===== */
+.doc-mode-simple .document-editor .ProseMirror table,
+.doc-mode-gb .document-editor .ProseMirror table,
+.doc-mode-official .document-editor .ProseMirror table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+}
+
+.doc-mode-simple .document-editor .ProseMirror td,
+.doc-mode-simple .document-editor .ProseMirror th,
+.doc-mode-gb .document-editor .ProseMirror td,
+.doc-mode-gb .document-editor .ProseMirror th,
+.doc-mode-official .document-editor .ProseMirror td,
+.doc-mode-official .document-editor .ProseMirror th {
+  border: 1px solid #000;
+  padding: 6pt 8pt;
+  text-align: center;
+  vertical-align: middle;
+  min-width: 80px;
+  font-family: "仿宋_GB2312", "仿宋", "FangSong", serif;
+  font-size: 16pt;
+  color: #000;
+}
+
+.doc-mode-simple .document-editor .ProseMirror th,
+.doc-mode-gb .document-editor .ProseMirror th,
+.doc-mode-official .document-editor .ProseMirror th {
+  font-weight: bold;
+  background: #f9fafb;
+}
+
+/* ===== 列表（公文格式） ===== */
+/* 
+   使用 TipTap 原生列表扩展的渲染。
+   !important 用于覆盖 Tailwind Preflight 的 list-style: none。
+*/
+
+.doc-mode-simple .document-editor .ProseMirror ul,
+.doc-mode-gb .document-editor .ProseMirror ul,
+.doc-mode-official .document-editor .ProseMirror ul {
+  list-style-type: disc !important;
+  list-style-position: inside !important;
+  padding-left: 2em !important;
+  margin: 0 !important;
+  font-size: 16pt !important;  /* 确保 2em = 2 字符 */
+}
+
+.doc-mode-simple .document-editor .ProseMirror ol,
+.doc-mode-gb .document-editor .ProseMirror ol,
+.doc-mode-official .document-editor .ProseMirror ol {
+  list-style-type: decimal !important;
+  list-style-position: inside !important;
+  padding-left: 2em !important;
+  margin: 0 !important;
+  font-size: 16pt !important;  /* 确保 2em = 2 字符 */
+}
+
+/* 符号字体 */
+.doc-mode-simple .document-editor .ProseMirror li::marker,
+.doc-mode-gb .document-editor .ProseMirror li::marker,
+.doc-mode-official .document-editor .ProseMirror li::marker {
+  font-family: "Times New Roman", serif !important;
+  font-size: 16pt !important;
+}
+
+/* 列表项通用 */
+.doc-mode-simple .document-editor .ProseMirror li,
+.doc-mode-gb .document-editor .ProseMirror li,
+.doc-mode-official .document-editor .ProseMirror li {
+  font-family: "Times New Roman", "仿宋_GB2312", "仿宋", "FangSong", serif !important;
+  font-size: 16pt !important;
+  line-height: 28pt !important;
+  margin: 0 !important;
+}
+
+/* 列表里的段落取消首行缩进 */
+.doc-mode-simple .document-editor .ProseMirror li p,
+.doc-mode-gb .document-editor .ProseMirror li p,
+.doc-mode-official .document-editor .ProseMirror li p {
+  text-indent: 0;
+  margin: 0;
+}
+
+/* 嵌套列表 */
+.doc-mode-simple .document-editor .ProseMirror ul ul,
+.doc-mode-simple .document-editor .ProseMirror ol ul,
+.doc-mode-simple .document-editor .ProseMirror ul ol,
+.doc-mode-simple .document-editor .ProseMirror ol ol,
+.doc-mode-gb .document-editor .ProseMirror ul ul,
+.doc-mode-gb .document-editor .ProseMirror ol ul,
+.doc-mode-gb .document-editor .ProseMirror ul ol,
+.doc-mode-gb .document-editor .ProseMirror ol ol,
+.doc-mode-official .document-editor .ProseMirror ul ul,
+.doc-mode-official .document-editor .ProseMirror ol ul,
+.doc-mode-official .document-editor .ProseMirror ul ol,
+.doc-mode-official .document-editor .ProseMirror ol ol {
+  margin: 0;
+}
+
+/* ================================================================
+   国标模式（gb）— 严格遵循 GB/T 9704-2012
+   ================================================================ */
+.doc-mode-gb .document-page {
+  /* 网页预览：紧凑排版，便于编辑 */
+  padding: 1.5cm 1.2cm 1.5cm 1.2cm;
+}
+
+/* ================================================================
+   红头模式（official）— 带红头和版记的正式发文格式
+   ================================================================ */
+.doc-mode-official .document-page {
+  /* 网页预览：紧凑排版，便于编辑 */
+  padding: 1.5cm 1.2cm 1.5cm 1.2cm;
+}
+
+/* ===== 打印/导出：严格遵循党政公文国标 GB/T 9704-2012 页边距 ===== */
+@media print {
+  .doc-mode-simple .document-page,
+  .doc-mode-gb .document-page,
+  .doc-mode-official .document-page {
+    padding: 3.7cm 2.8cm 3.5cm 2.6cm !important;
+  }
+}
+
+/* ===== 红头样式 ===== */
+.red-header-text {
+  font-family: "方正小标宋简体", "FZXiaoBiaoSong-B05S", serif;
+  font-size: 22pt;
+  font-weight: bold;
+  color: #c00;
+  text-align: center;
+  line-height: 2.0;
+}
+
+.red-header-separator {
+  border-top: 2px solid #c00;
+  margin: 4pt 0 16pt 0;
+  width: 100%;
+}
+
+/* ===== 印章 ===== */
+.official-seal {
+  display: inline-block;
+  border: 2px solid #c00;
+  border-radius: 50%;
+  padding: 8pt 12pt;
+  color: #c00;
+  font-family: "楷体_GB2312", "楷体", "KaiTi", serif;
+  font-size: 14pt;
+  text-align: center;
+}
+
+/* ===== 版记 ===== */
+.doc-mode-simple .document-editor .official-footer,
+.doc-mode-gb .document-editor .official-footer,
+.doc-mode-official .document-editor .official-footer {
+  border-top: 1px solid #000;
+  margin-top: 20pt;
+  padding-top: 4pt;
+  font-size: 14pt;
+  line-height: 1.8;
+}
+
+/* 版记自动渲染区域 */
+.de-banji-preview {
+  margin-top: 30pt;
+  padding-top: 2pt;
+}
+
+.de-banji-line {
+  border-top: 0.5pt solid #000;
+  margin: 4pt 0;
+  width: 100%;
+}
+
+.de-banji-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2pt 0;
+}
+
+.de-banji-left, .de-banji-right {
+  font-family: "仿宋_GB2312", "仿宋", "FangSong", serif;
+  font-size: 14pt;
+  line-height: 1.8;
+}
+
+.de-banji-right {
+  text-align: right;
+}
+
+/* ===== 落款 ===== */
+.signature-block {
+  text-align: right;
+  margin-top: 30pt;
+}
+
+.signature-block p {
+  text-indent: 0;
+  text-align: right;
+}
+
+/* ===== 引用块 ===== */
+.doc-mode-simple .document-editor .ProseMirror blockquote,
+.doc-mode-gb .document-editor .ProseMirror blockquote,
+.doc-mode-official .document-editor .ProseMirror blockquote {
+  border-left: 3px solid #d1d5db;
+  padding-left: 1em;
+  line-height: 28pt;
+  margin: 0 0 0 2em;
+}
+
+/* ===== 选择高亮 ===== */
+.ProseMirror-selectednode {
+  outline: 2px solid #ef4444;
+  border-radius: 2px;
+}
+
+.ProseMirror .selectedCell {
+  background: #fef2f2;
+}
