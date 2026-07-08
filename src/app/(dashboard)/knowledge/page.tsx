@@ -15,6 +15,7 @@ import {
   ExternalLink, Trash2, Clock, UserCheck, Eye,
 } from "lucide-react";
 import { getAllCategories, getCategoryColor } from "@/types";
+import { cachedFetch, invalidateCache } from "@/lib/cache";
 
 interface KnowledgeDoc {
   id: string;
@@ -48,8 +49,12 @@ export default function KnowledgePage() {
     const params = new URLSearchParams({ reviewed: "true", pageSize: "100" });
     if (activeCat) params.set("category", activeCat);
     if (search) params.set("search", search);
-    fetch(`/api/documents?${params}`)
-      .then((r) => r.json())
+    const url = `/api/documents?${params}`;
+    cachedFetch(
+      `knowledge:${activeCat}:${search}`,
+      () => fetch(url).then((r) => r.json()),
+      30_000,
+    )
       .then((b) => {
         if (b.success) {
           setDocs(b.data?.items || b.data || []);
@@ -59,7 +64,7 @@ export default function KnowledgePage() {
       .catch(() => setLoading(false));
   };
 
-  useEffect(() => { loadDocs(); }, [activeCat]);
+  useEffect(() => { loadDocs(); }, [activeCat, search]);
 
   // 驳回审阅
   const rejectReview = async (docId: string, title: string) => {
@@ -76,6 +81,7 @@ export default function KnowledgePage() {
       const b = await res.json();
       if (b.success) {
         setDocs((prev) => prev.filter((d) => d.id !== docId));
+        invalidateCache("knowledge:");
         showToast("success", `已驳回审阅：「${title}」`);
       } else {
         showToast("error", "操作失败");

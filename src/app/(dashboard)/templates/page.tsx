@@ -36,6 +36,7 @@ import {
   type GovDocTemplateContent,
 } from "@/lib/builtin-templates";
 import { ContentPreviewModal } from "@/components/ui/ContentPreviewModal";
+import { cachedFetch, invalidateCache } from "@/lib/cache";
 
 // ── 类型定义 ──
 
@@ -61,6 +62,8 @@ interface CustomCategory {
   isBuiltin: boolean; // false = 用户创建
   color?: string;    // 标签颜色（用户选择时设定）
 }
+
+const LAST_CAT_KEY = "gw-templates-last-cat";
 
 // ── 确认弹窗 action 类型 ──
 interface ConfirmAction {
@@ -96,7 +99,11 @@ function toggleActiveSkillId(c: string, id: string) {
 // ── 主组件 ───────────────────────────────────────
 
 export default function TemplatesPage() {
-  const [activeCat, setActiveCat] = useState<string>(DOCUMENT_CATEGORIES[0]);
+  const [activeCat, setActiveCatRaw] = useState<string>(DOCUMENT_CATEGORIES[0]);
+  const setActiveCat = (cat: string) => {
+    setActiveCatRaw(cat);
+    try { localStorage.setItem(LAST_CAT_KEY, cat); } catch {}
+  };
   const [allCustomTpls, setAllCustomTpls] = useState<CustomTemplate[]>([]);
   const [allSkills, setAllSkills] = useState<DocSkill[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,6 +150,16 @@ export default function TemplatesPage() {
   // 所有可用的分类 = 内置11类 + 用户自定义
   const allCategories = [...DOCUMENT_CATEGORIES, ...customCategories.map(c => c.name)];
 
+  // 恢复上次选中的分类
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LAST_CAT_KEY);
+      if (saved && allCategories.includes(saved)) {
+        setActiveCatRaw(saved);
+      }
+    } catch {}
+  }, []);
+
   // 解析任意分类的有效颜色（内置从 CATEGORY_COLORS 取，自定义从自身 color 取）
   const resolveCatColor = (cat: string): string => {
     if (CATEGORY_COLORS[cat]) return CATEGORY_COLORS[cat];
@@ -156,14 +173,20 @@ export default function TemplatesPage() {
     setLoading(true);
     try {
       const [tplRes, skillRes] = await Promise.all([
-        fetch("/api/templates").then((r) => r.json()),
-        fetch("/api/skills").then((r) => r.json()), // 全量，前端按分类聚合
+        cachedFetch("templates:list", () => fetch("/api/templates").then((r) => r.json()), 30_000),
+        cachedFetch("skills:list", () => fetch("/api/skills").then((r) => r.json()), 30_000),
       ]);
       if (tplRes.success && tplRes.data?.custom) setAllCustomTpls(tplRes.data.custom);
       if (skillRes.success) setAllSkills(skillRes.data || []);
     } catch { /* ignore */ }
     setLoading(false);
   }, []);
+
+  const refreshData = () => {
+    invalidateCache("templates:");
+    invalidateCache("skills:");
+    loadData();
+  };
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -221,7 +244,7 @@ export default function TemplatesPage() {
     if (body.success) {
       showDialog("成功", isEdit ? "模板已更新" : "模板已创建");
       setTplModal(null);
-      loadData();
+      refreshData();
     } else {
       showDialog("失败", body.error?.message || "操作失败");
     }
@@ -237,7 +260,7 @@ export default function TemplatesPage() {
     if (res.ok) {
       showDialog("成功", "模板已删除");
       setConfirmAction(null);
-      loadData();
+      refreshData();
     }
   };
 
@@ -256,7 +279,7 @@ export default function TemplatesPage() {
     if (body.success) {
       showDialog("成功", "已复制为自定义模板");
       setConfirmAction(null);
-      loadData();
+      refreshData();
     } else {
       showDialog("失败", body.error?.message || "复制失败");
     }
@@ -301,7 +324,7 @@ export default function TemplatesPage() {
     if (body.success) {
       showDialog("成功", isEdit ? "Skill 已更新" : "Skill 已创建");
       setSkillModal(null);
-      loadData();
+      refreshData();
     } else {
       showDialog("失败", body.error?.message || "操作失败");
     }
@@ -317,7 +340,7 @@ export default function TemplatesPage() {
     if (res.ok) {
       showDialog("成功", "Skill 已删除");
       setConfirmAction(null);
-      loadData();
+      refreshData();
     }
   };
 
@@ -326,7 +349,7 @@ export default function TemplatesPage() {
     if (res.ok) {
       showDialog("成功", "已恢复默认，所有自定义模板已清空");
       setConfirmAction(null);
-      loadData();
+      refreshData();
     }
   };
 

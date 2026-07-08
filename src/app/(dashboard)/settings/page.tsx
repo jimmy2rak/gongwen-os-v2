@@ -29,9 +29,23 @@ const SETTINGS_MENUS: SettingsMenu[] = [
 ];
 
 export default function SettingsPage() {
-  const [active, setActive] = useState<string>("api");
+  const [active, setActiveRaw] = useState<string>("api");
+  const setActive = (id: string) => {
+    setActiveRaw(id);
+    try { localStorage.setItem("gw-settings-active", id); } catch {}
+  };
   const [isSuper, setIsSuper] = useState(false);
   const current = SETTINGS_MENUS.find((m) => m.id === active) ?? SETTINGS_MENUS[0];
+
+  // 恢复上次选中的 tab
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("gw-settings-active");
+      if (saved && SETTINGS_MENUS.some((m) => m.id === saved)) {
+        setActiveRaw(saved);
+      }
+    } catch {}
+  }, []);
 
   // 超管探测：拉取爬虫列表，200 → 是超管；401/403 → 普通用户（不显示入口）
   useEffect(() => {

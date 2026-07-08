@@ -24,7 +24,18 @@ export async function GET(req: NextRequest) {
       sql: "SELECT * FROM crawler_source ORDER BY create_time DESC",
       args: [],
     });
-    return NextResponse.json({ success: true, data: rows.rows });
+    const data = (rows.rows || []).map((r: any) => ({
+      id: r.id,
+      sourceName: r.source_name,
+      baseUrl: r.base_url,
+      targetColumnId: r.target_column_id,
+      categoryTag: r.category_tag,
+      enable: r.enable,
+      createBy: r.create_by,
+      createTime: r.create_time,
+      updateTime: r.update_time,
+    }));
+    return NextResponse.json({ success: true, data });
   } catch (e) {
     console.error("[crawler/list] Error:", e);
     return NextResponse.json({ success: false, error: { message: "查询失败" } }, { status: 500 });

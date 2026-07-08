@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: "请求体不是合法 JSON" }, { status: 400 });
   }
 
-  const { sourceId, columnId, title, contentPlain, contentHtml, pageName, originUrl, crawlDate } = body;
+  const { sourceId, sourceName, columnId, title, contentPlain, contentHtml, pageName, originUrl, crawlDate } = body;
   if (!title || !String(title).trim()) {
     return NextResponse.json({ success: false, message: "title 不能为空" }, { status: 400 });
   }
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       args: [
         id,
         sourceId || null,
-        null,
+        sourceName || null,
         columnId || null,
         String(title).trim(),
         contentPlain || null,

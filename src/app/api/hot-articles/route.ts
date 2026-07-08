@@ -37,7 +37,21 @@ export async function GET(req: NextRequest) {
       " ORDER BY created_at DESC LIMIT 200";
 
     const rows = await client.execute({ sql, args });
-    return NextResponse.json({ success: true, data: rows.rows });
+    const data = (rows.rows || []).map((r: any) => ({
+      id: r.id,
+      sourceId: r.source_id,
+      sourceName: r.source_name,
+      columnId: r.column_id,
+      title: r.title,
+      contentPlain: r.content_plain,
+      contentHtml: r.content_html,
+      pageName: r.page_name,
+      originUrl: r.origin_url,
+      crawlDate: r.crawl_date,
+      isPublished: r.is_published,
+      createdAt: r.created_at,
+    }));
+    return NextResponse.json({ success: true, data });
   } catch (e) {
     console.error("[hot-articles GET] Error:", e);
     return NextResponse.json({ success: false, error: { message: "查询失败" } }, { status: 500 });

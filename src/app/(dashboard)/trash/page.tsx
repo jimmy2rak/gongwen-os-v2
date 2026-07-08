@@ -11,6 +11,7 @@ import {
   Search, FileText, Trash2, RotateCcw, Clock,
   CheckCircle, AlertCircle, X, AlertTriangle,
 } from "lucide-react";
+import { cachedFetch, invalidateCache } from "@/lib/cache";
 
 interface TrashItem {
   id: string;
@@ -77,18 +78,25 @@ export default function TrashPage() {
     catch { return 0; }
   };
 
-  // 加载回收站列表
-  const loadDocs = useCallback(async (q: string) => {
+  // 加载回收站列表（含缓存）
+  const loadDocs = useCallback(async (q: string, skipCache = false) => {
     setLoading(true);
     setError("");
     try {
       const url = q
         ? `/api/documents?deleted=true&search=${encodeURIComponent(q)}&pageSize=100`
         : "/api/documents?deleted=true&pageSize=100";
-      const res = await fetch(url);
-      if (res.status === 401 || res.redirected) { setLoading(false); return; }
-      if (!res.ok) throw new Error("请求失败");
-      const body = await res.json();
+      const fetcher = async () => {
+        const res = await fetch(url);
+        if (res.status === 401 || res.redirected) return { __unauthorized: true };
+        if (!res.ok) throw new Error("请求失败");
+        return res.json();
+      };
+      const body = await cachedFetch(`trash:${q}`, fetcher, skipCache ? 0 : 30_000);
+      if ((body as any).__unauthorized) {
+        setLoading(false);
+        return;
+      }
       if (body.success) {
         setDocs(body.data || []);
       } else {
@@ -141,6 +149,8 @@ export default function TrashPage() {
       if (body.success) {
         setDocs((prev) => prev.filter((d) => d.id !== id));
         setSelected((prev) => { const n = new Set(prev); n.delete(id); return n; });
+        invalidateCache("trash:");
+        invalidateCache("documents:");
         showToast("success", "恢复成功");
       } else {
         showToast("error", body.error?.message || "恢复失败");
@@ -161,6 +171,7 @@ export default function TrashPage() {
       if (body.success) {
         setDocs((prev) => prev.filter((d) => d.id !== id));
         setSelected((prev) => { const n = new Set(prev); n.delete(id); return n; });
+        invalidateCache("trash:");
         showToast("success", "已永久删除");
       } else {
         showToast("error", body.error?.message || "删除失败");
@@ -189,6 +200,8 @@ export default function TrashPage() {
         setDocs((prev) => prev.filter((d) => !ids.includes(d.id)));
         setSelected(new Set());
         setSelectAll(false);
+        invalidateCache("trash:");
+        invalidateCache("documents:");
         showToast("success", `已恢复 ${ids.length} 篇文档`);
       } else {
         showToast("error", body.error?.message || "批量恢复失败");
@@ -216,6 +229,7 @@ export default function TrashPage() {
         setDocs((prev) => prev.filter((d) => !ids.includes(d.id)));
         setSelected(new Set());
         setSelectAll(false);
+        invalidateCache("trash:");
         showToast("success", `已永久删除 ${ids.length} 篇文档`);
       } else {
         showToast("error", body.error?.message || "批量删除失败");
@@ -305,27 +319,27 @@ export default function TrashPage() {
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/50">
+                <tr className="border-b border-[#c9a55c]/10 bg-[#c9a55c]/[0.06]">
                   <th className="w-10 px-3 py-3">
                     <input type="checkbox" checked={selectAll} onChange={toggleSelectAll}
-                      className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer" />
+                      className="w-4 h-4 rounded border-[#c9a55c]/30 text-[#c9a55c] focus:ring-[#c9a55c]/30 cursor-pointer" />
                   </th>
-                  <th className="text-left px-2 py-3 text-[11px] font-medium text-gray-500 uppercase tracking-wider">标题</th>
-                  <th className="text-left px-2 py-3 text-[11px] font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">分类</th>
-                  <th className="text-center px-2 py-3 text-[11px] font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">字数</th>
-                  <th className="text-left px-2 py-3 text-[11px] font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">创建时间</th>
-                  <th className="text-left px-2 py-3 text-[11px] font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">修改时间</th>
-                  <th className="text-left px-2 py-3 text-[11px] font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell">审阅人</th>
-                  <th className="text-center px-2 py-3 text-[11px] font-medium text-gray-500 uppercase tracking-wider">审阅状态</th>
-                  <th className="text-left px-2 py-3 text-[11px] font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">删除时间</th>
-                  <th className="text-right px-3 py-3 text-[11px] font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                  <th className="text-left px-2 py-3 text-[11px] font-medium text-[#c9a55c] uppercase tracking-wider">标题</th>
+                  <th className="text-left px-2 py-3 text-[11px] font-medium text-[#c9a55c] uppercase tracking-wider hidden sm:table-cell">分类</th>
+                  <th className="text-center px-2 py-3 text-[11px] font-medium text-[#c9a55c] uppercase tracking-wider hidden md:table-cell">字数</th>
+                  <th className="text-left px-2 py-3 text-[11px] font-medium text-[#c9a55c] uppercase tracking-wider hidden lg:table-cell">创建时间</th>
+                  <th className="text-left px-2 py-3 text-[11px] font-medium text-[#c9a55c] uppercase tracking-wider hidden lg:table-cell">修改时间</th>
+                  <th className="text-left px-2 py-3 text-[11px] font-medium text-[#c9a55c] uppercase tracking-wider hidden xl:table-cell">审阅人</th>
+                  <th className="text-center px-2 py-3 text-[11px] font-medium text-[#c9a55c] uppercase tracking-wider">审阅状态</th>
+                  <th className="text-left px-2 py-3 text-[11px] font-medium text-[#c9a55c] uppercase tracking-wider hidden lg:table-cell">删除时间</th>
+                  <th className="text-right px-3 py-3 text-[11px] font-medium text-[#c9a55c] uppercase tracking-wider">操作</th>
                 </tr>
               </thead>
               <tbody>
                 {docs.map((doc) => {
                   const isSelected = selected.has(doc.id);
                   return (
-                    <tr key={doc.id} className={`border-b border-gray-50 transition-colors ${isSelected ? "bg-amber-50/50" : "hover:bg-gray-50/50"}`}>
+                    <tr key={doc.id} className={`border-b border-gray-50 transition-colors ${isSelected ? "bg-amber-50/50" : "hover:bg-[#c9a55c]/[0.04]"}`}>
                       <td className="px-3 py-3">
                         <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(doc.id)}
                           className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer" />
