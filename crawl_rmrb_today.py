@@ -3,16 +3,16 @@
 """
 人民日报 · 理论版+评论版 · 当日自动爬虫（第二版）
 =================================================
-基于用户验证有效的爬取逻辑重写，重点修复：
-  1. 版面列表选择器兼容
-  2. 文章链接构造（不再用 urljoin，而是按人民日报目录规则拼接）
-  3. 更详细的调试输出，方便定位问题
+内置密钥，无需 export 环境变量，Deepnote / 终端直接跑。
 
 依赖：pip install requests beautifulsoup4
 运行：
-  export BACKEND_URL=https://gongwenos.182183.xyz
-  export CRAWLER_API_KEY=<你的 X-Crawler-Auth 密钥>
-  python3 crawl_rmrb_today.py
+  python3 crawl_rmrb_today.py             # 直接爬取并入库
+  python3 crawl_rmrb_today.py --dry-run   # 仅预览不写入
+
+如需覆盖密钥或后端地址，设环境变量即可（优先于内置值）：
+  export CRAWLER_API_KEY=your_key
+  export BACKEND_URL=https://your-domain.xyz
 """
 
 import os
@@ -24,9 +24,12 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
-# ── 配置 ──────────────────────────────────────────
-BACKEND_URL = (os.environ.get("BACKEND_URL") or "https://gongwenos.182183.xyz").rstrip("/")
-API_KEY = os.environ.get("CRAWLER_API_KEY") or ""
+# ── 内置配置（Deepnote/终端直接可用，环境变量优先）────
+_CRAWLER_API_KEY = "gw_crawler_9858de6414cd6114e4ae60b07d170329"
+_BACKEND_URL = "https://gongwenos.182183.xyz"
+
+BACKEND_URL = (os.environ.get("BACKEND_URL") or _BACKEND_URL).rstrip("/")
+API_KEY = os.environ.get("CRAWLER_API_KEY") or _CRAWLER_API_KEY
 UPLOAD_URL = f"{BACKEND_URL}/api/public/crawler/upload"
 SOURCE_NAME = "人民日报"
 COLUMN_ID = "人民日报"  # 前端板块名

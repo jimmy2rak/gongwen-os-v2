@@ -1,11 +1,29 @@
 // ─── 顶部导航栏 ──────────────────────────────────
-// 显示页面标题 + 用户信息 + 退出按钮
+// 显示页面标题 + 用户信息 + 退出按钮 + 主题切换
 
 "use client";
 
 import { useAuthStore } from "@/stores/auth.store";
-import { LogOut, User, Menu, Home } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { LogOut, User, Menu, Home, Sun, Moon, Monitor } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+
+type ThemeMode = "light" | "dark" | "auto";
+
+const THEME_KEY = "gw-theme-mode";
+
+function getStoredTheme(): ThemeMode {
+  if (typeof window === "undefined") return "auto";
+  try {
+    const stored = localStorage.getItem(THEME_KEY);
+    if (stored === "light" || stored === "dark" || stored === "auto") return stored;
+  } catch {}
+  return "auto";
+}
+
+function applyTheme(mode: ThemeMode) {
+  const isDark = mode === "dark" || (mode === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.classList.toggle("dark", isDark);
+}
 
 export function Topbar({
   title,
@@ -19,13 +37,39 @@ export function Topbar({
 }) {
   const { user, logout } = useAuthStore();
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredTheme);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const themeMenuRef = useRef<HTMLDivElement>(null);
 
-  // 点击其他地方时关闭用户菜单
+  // 应用主题并持久化
+  const changeTheme = useCallback((mode: ThemeMode) => {
+    setThemeMode(mode);
+    try { localStorage.setItem(THEME_KEY, mode); } catch {}
+    applyTheme(mode);
+    setShowThemeMenu(false);
+  }, []);
+
+  // 监听系统主题变化（auto 模式）
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = () => {
+      if (getStoredTheme() === "auto") {
+        applyTheme("auto");
+      }
+    };
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  // 点击其他地方关闭菜单
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setShowUserMenu(false);
+      }
+      if (themeMenuRef.current && !themeMenuRef.current.contains(e.target as Node)) {
+        setShowThemeMenu(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -34,10 +78,10 @@ export function Topbar({
 
   const handleLogout = async () => {
     await logout();
-    // 使用 window.location.href 强制全页跳转，确保中间件重新检查 Cookie
-    // 如果用 router.push()，Next.js 客户端导航不会重新触发中间件
     window.location.href = "/login";
   };
+
+  const ThemeIcon = themeMode === "light" ? Sun : themeMode === "dark" ? Moon : Monitor;
 
   return (
     <header className="h-14 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-4">
@@ -57,8 +101,51 @@ export function Topbar({
         )}
       </div>
 
-      {/* 右侧：用户信息 */}
-      <div className="flex items-center gap-3 flex-shrink-0">
+      {/* 右侧：主题切换 + 用户信息 */}
+      <div className="flex items-center gap-1 flex-shrink-0">
+        {/* 主题切换下拉菜单 */}
+        <div className="relative" ref={themeMenuRef}>
+          <button
+            onClick={() => setShowThemeMenu(!showThemeMenu)}
+            className="p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors"
+            title={
+              themeMode === "light" ? "明亮模式" :
+              themeMode === "dark" ? "黑暗模式" : "跟随系统"
+            }
+          >
+            <ThemeIcon className="w-4 h-4" />
+          </button>
+
+          {showThemeMenu && (
+            <div className="absolute right-0 top-full mt-1 w-36 bg-popover border border-sidebar-border rounded-lg shadow-lg py-1 z-50">
+              <button
+                onClick={() => changeTheme("light")}
+                className={`flex items-center gap-2 w-full px-3 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent ${
+                  themeMode === "light" ? "font-medium" : ""
+                }`}
+              >
+                <Sun className="w-4 h-4" /> 明亮
+              </button>
+              <button
+                onClick={() => changeTheme("dark")}
+                className={`flex items-center gap-2 w-full px-3 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent ${
+                  themeMode === "dark" ? "font-medium" : ""
+                }`}
+              >
+                <Moon className="w-4 h-4" /> 黑暗
+              </button>
+              <button
+                onClick={() => changeTheme("auto")}
+                className={`flex items-center gap-2 w-full px-3 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent ${
+                  themeMode === "auto" ? "font-medium" : ""
+                }`}
+              >
+                <Monitor className="w-4 h-4" /> 自动
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* 首页图标 */}
         <a href="/home"
           className="p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors"
@@ -66,10 +153,10 @@ export function Topbar({
           <Home className="w-4 h-4" />
         </a>
         {user && (
-          <div className="relative" ref={menuRef}>
+          <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-sidebar-accent text-sm text-sidebar-foreground/80"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-sidebar-accent text-sm text-sidebar-foreground/80 ml-1"
             >
               <User className="w-4 h-4" />
               <span>{user.name || user.email}</span>

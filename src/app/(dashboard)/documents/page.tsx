@@ -9,6 +9,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PreviewModal } from "@/components/editor/PreviewModal";
 import { ExportMenu } from "@/components/editor/ExportMenu";
 import { ReviewDialog } from "@/components/editor/ReviewDialog";
+import { CategoryFilterPills } from "@/components/ui/CategoryFilterPills";
 import { getCategoryColor, getAllCategories, DOCUMENT_CATEGORIES } from "@/types";
 import { getFavoriteIds, isFavorite, toggleFavorite } from "@/lib/favorite-store";
 import { cachedFetch, invalidateCache } from "@/lib/cache";
@@ -366,12 +367,11 @@ export default function DocumentsPage() {
             <Star className="w-3 h-3" fill={favFilter ? "currentColor" : "none"} /> 收藏
           </button>
 
-          {/* 分类筛选 */}
-          <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}
-            className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-red-300">
-            <option value="">全部类型</option>
-            {allCats.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
+          {/* 分类筛选 — 改为 pill 样式（公文类型联动机制不变） */}
+          <CategoryFilterPills
+            activeCat={catFilter}
+            onChange={(cat) => setCatFilter(cat)}
+          />
 
           {/* 排序设置 */}
           <div className="relative">

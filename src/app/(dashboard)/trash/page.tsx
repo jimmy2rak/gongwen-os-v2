@@ -6,7 +6,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuthStore } from "@/stores/auth.store";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { getCategoryColor } from "@/types";
+import { CategoryFilterPills } from "@/components/ui/CategoryFilterPills";
+import { getCategoryColor, getAllCategories } from "@/types";
 import {
   Search, FileText, Trash2, RotateCcw, Clock,
   CheckCircle, AlertCircle, X, AlertTriangle,
@@ -34,6 +35,8 @@ export default function TrashPage() {
   const [docs, setDocs] = useState<TrashItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [catFilter, setCatFilter] = useState("");
   const [error, setError] = useState("");
 
   // 选中
@@ -79,20 +82,21 @@ export default function TrashPage() {
   };
 
   // 加载回收站列表（含缓存）
-  const loadDocs = useCallback(async (q: string, skipCache = false) => {
+  const loadDocs = useCallback(async (q: string, cat?: string, skipCache = false) => {
     setLoading(true);
     setError("");
     try {
-      const url = q
-        ? `/api/documents?deleted=true&search=${encodeURIComponent(q)}&pageSize=100`
-        : "/api/documents?deleted=true&pageSize=100";
+      const params = new URLSearchParams({ deleted: "true", pageSize: "100" });
+      if (q) params.set("search", q);
+      if (cat) params.set("category", cat);
+      const url = `/api/documents?${params}`;
       const fetcher = async () => {
         const res = await fetch(url);
         if (res.status === 401 || res.redirected) return { __unauthorized: true };
         if (!res.ok) throw new Error("请求失败");
         return res.json();
       };
-      const body = await cachedFetch(`trash:${q}`, fetcher, skipCache ? 0 : 30_000);
+      const body = await cachedFetch(`trash:${q}:${cat || ""}`, fetcher, skipCache ? 0 : 30_000);
       if ((body as any).__unauthorized) {
         setLoading(false);
         return;
@@ -110,16 +114,16 @@ export default function TrashPage() {
   }, []);
 
   useEffect(() => { if (user) loadDocs(""); }, [user, loadDocs]);
+  useEffect(() => { if (user) { loadDocs(search, catFilter); } }, [catFilter]);
 
   // 搜索防抖
-  const [search, setSearch] = useState("");
   useEffect(() => {
     const t = setTimeout(() => {
       setSearch(searchInput);
-      if (searchInput !== search) loadDocs(searchInput);
+      if (searchInput !== search) loadDocs(searchInput, catFilter);
     }, 400);
     return () => clearTimeout(t);
-  }, [searchInput, search, loadDocs]);
+  }, [searchInput, search, loadDocs, catFilter]);
 
   // 全选
   const toggleSelectAll = () => {
@@ -268,6 +272,14 @@ export default function TrashPage() {
               className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
             />
           </div>
+        </div>
+
+        {/* 分类筛选 — 复刻知识库 */}
+        <div className="mb-4">
+          <CategoryFilterPills
+            activeCat={catFilter}
+            onChange={(cat) => setCatFilter(cat)}
+          />
         </div>
 
         {/* 批量操作栏 */}

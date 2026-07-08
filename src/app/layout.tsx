@@ -32,12 +32,17 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
-                function applyTheme() {
-                  const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  document.documentElement.classList.toggle('dark', dark);
+                var THEME_KEY = 'gw-theme-mode';
+                var mode = 'auto';
+                try { var s = localStorage.getItem(THEME_KEY); if (s === 'light' || s === 'dark' || s === 'auto') mode = s; } catch(e) {}
+                function apply(m) {
+                  var isDark = m === 'dark' || (m === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                  document.documentElement.classList.toggle('dark', isDark);
                 }
-                applyTheme();
-                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+                apply(mode);
+                if (mode === 'auto') {
+                  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() { apply('auto'); });
+                }
               })();
             `,
           }}
