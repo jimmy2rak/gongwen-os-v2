@@ -27,6 +27,22 @@ export default function RootLayout({
       lang="zh-CN"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                function applyTheme() {
+                  const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  document.documentElement.classList.toggle('dark', dark);
+                }
+                applyTheme();
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

@@ -278,7 +278,7 @@ def main():
     ap.add_argument("--token", default=os.environ.get("AUTH_TOKEN", ""),
                     help="API 认证 token（或设环境变量 AUTH_TOKEN）")
     ap.add_argument("--dry-run", action="store_true", help="仅预览不写入")
-    args = ap.parse_args()
+    args, _ = ap.parse_known_args()
 
     mode = "local"
     if args.db:

@@ -1,5 +1,5 @@
 // ─── POST /api/ai/chat — 流式公文 AI 对话 ───────
-// 1) 校验登录；2) 取该用户指定厂商且启用状态的 API Key 并解密；
+// 1) 校验登录；2) 取用户指定厂商且启用的 API Key（或系统默认 MiniCPM）并解密；
 // 3) 调用厂商 OpenAI 兼容 /chat/completions（stream:true）；
 // 4) 将厂商 SSE 原样透传回前端（text/event-stream）。
 
@@ -10,6 +10,7 @@ import { getServerUser } from "@/server/auth/guard";
 import { eq, and } from "drizzle-orm";
 import { decryptApiKey } from "@/server/lib/crypto";
 import { getProvider, isValidProvider } from "@/server/lib/ai/providers";
+import { getSystemMiniCPMConfig } from "@/server/lib/ai/system-minicpm";
 import { buildSystemPrompt, ChatMessage } from "@/server/lib/ai/prompts";
 
 export const runtime = "nodejs";
@@ -19,7 +20,6 @@ interface ChatBody {
   messages?: ChatMessage[];
   provider?: string;
   model?: string;
-  /** 客户端拼接的全局上下文（默认画像 + 全局 Skill），追加到系统提示词 */
   systemExtra?: string;
 }
 
@@ -48,7 +48,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: { message: "消息为空" } }, { status: 400 });
   }
 
-  // 仅保留合法角色，防止注入
   const safeMessages = messages
     .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
     .map((m) => ({ role: m.role, content: m.content }));
@@ -57,32 +56,46 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: { message: "消息为空" } }, { status: 400 });
   }
 
-  // 查询该用户指定厂商且启用的密钥
+  const preset = getProvider(provider)!;
+  let apiKey = "";
+  let baseUrl = preset.baseURL;
+
+  // 先查用户自己的 key
   const rows = await db
     .select()
     .from(apiKeys)
     .where(and(eq(apiKeys.userId, user.id), eq(apiKeys.provider, provider), eq(apiKeys.isActive, true)))
     .limit(1);
 
-  if (rows.length === 0) {
+  if (rows.length > 0) {
+    const row = rows[0];
+    try {
+      apiKey = decryptApiKey(row.encrypted, row.iv);
+    } catch {
+      return NextResponse.json({ success: false, error: { message: "密钥解密失败" } }, { status: 500 });
+    }
+    if (row.baseUrl) {
+      baseUrl = row.baseUrl as string;
+    }
+  } else if (provider === "minicpm") {
+    // 回退到系统默认 MiniCPM
+    const systemCfg = await getSystemMiniCPMConfig();
+    if (!systemCfg || !systemCfg.isActive) {
+      return NextResponse.json(
+        { success: false, error: { message: "该厂商尚未配置或启用 API Key，请到系统设置 → API 配置中添加" } },
+        { status: 400 }
+      );
+    }
+    apiKey = systemCfg.apiKey;
+    if (systemCfg.baseUrl) baseUrl = systemCfg.baseUrl;
+  } else {
     return NextResponse.json(
       { success: false, error: { message: "该厂商尚未配置或启用 API Key，请到系统设置 → API 配置中添加" } },
       { status: 400 }
     );
   }
 
-  const row = rows[0];
-  let apiKey: string;
-  try {
-    apiKey = decryptApiKey(row.encrypted, row.iv);
-  } catch {
-    return NextResponse.json({ success: false, error: { message: "密钥解密失败" } }, { status: 500 });
-  }
-
-  const preset = getProvider(provider)!;
-  const upstreamUrl = `${preset.baseURL}/chat/completions`;
-
-  // 透传 SSE 流（在公文系统提示词基础上追加全局上下文：画像 + 全局 Skill）
+  const upstreamUrl = `${baseUrl}/chat/completions`;
   const systemPrompt = buildSystemPrompt(body.systemExtra);
   const payload = JSON.stringify({
     model,
@@ -106,12 +119,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: { message: "调用模型服务失败（网络错误）" } }, { status: 502 });
   }
 
-  // 上游返回非 2xx（如 401 密钥错误 / 429 限流 / 模型不存在）
   if (!upstream.ok || !upstream.body) {
     let detail = "";
     try {
       detail = await upstream.text();
-      // 截断，避免把长错误回传给前端
       detail = detail.slice(0, 300);
     } catch {}
     console.error(`[ai/chat] 上游错误 ${upstream.status}:`, detail);

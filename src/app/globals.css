@@ -99,37 +99,38 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  /* 政务深色：墨绿底 + 暖灰文字，避免纯黑刺眼 */
+  --background: oklch(0.18 0.01 170);
+  --foreground: oklch(0.95 0.01 85);
+  --card: oklch(0.22 0.01 170);
+  --card-foreground: oklch(0.95 0.01 85);
+  --popover: oklch(0.22 0.01 170);
+  --popover-foreground: oklch(0.95 0.01 85);
+  --primary: #c9a55c;             /* 暖金主色 */
+  --primary-foreground: #0f2e2a;
+  --secondary: oklch(0.26 0.01 170);
+  --secondary-foreground: oklch(0.92 0.01 85);
+  --muted: oklch(0.26 0.01 170);
+  --muted-foreground: oklch(0.65 0.01 85);
+  --accent: oklch(0.26 0.01 170);
+  --accent-foreground: oklch(0.92 0.01 85);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
+  --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: #c9a55c;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar: oklch(0.16 0.01 170);
+  --sidebar-foreground: oklch(0.92 0.01 85);
+  --sidebar-primary: #c9a55c;
+  --sidebar-primary-foreground: #0f2e2a;
+  --sidebar-accent: oklch(0.24 0.01 170);
+  --sidebar-accent-foreground: oklch(0.92 0.01 85);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: #c9a55c;
 }
 
 @layer base {
@@ -142,4 +143,144 @@
   html {
     @apply font-sans;
   }
+}
+
+/* ── 暗色模式：覆盖页面中硬编码的 Tailwind 颜色，避免大面积改文件 ── */
+.dark .bg-white,
+.dark .bg-gray-50 {
+  background-color: var(--card) !important;
+}
+.dark .bg-gray-100 {
+  background-color: var(--secondary) !important;
+}
+.dark .text-gray-800,
+.dark .text-gray-900 {
+  color: var(--card-foreground) !important;
+}
+.dark .text-gray-700 {
+  color: var(--foreground) !important;
+}
+.dark .text-gray-600,
+.dark .text-gray-500,
+.dark .text-gray-400 {
+  color: var(--muted-foreground) !important;
+}
+.dark .border-gray-200,
+.dark .border-gray-100,
+.dark .border-\[\#e7e2d8\] {
+  border-color: var(--border) !important;
+}
+.dark .bg-\[\#f6f4ef\] {
+  background-color: var(--secondary) !important;
+}
+.dark .bg-\[\#163f3a\]\/5 {
+  background-color: rgba(201, 165, 92, 0.1) !important;
+}
+.dark .bg-\[\#163f3a\]\/10 {
+  background-color: rgba(201, 165, 92, 0.15) !important;
+}
+.dark .text-\[\#163f3a\] {
+  color: #c9a55c !important;
+}
+.dark .hover\:bg-\[\#163f3a\]\/10:hover {
+  background-color: rgba(201, 165, 92, 0.15) !important;
+}
+.dark .bg-blue-50 {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+}
+.dark .text-blue-600 {
+  color: #60a5fa !important;
+}
+.dark .text-blue-500 {
+  color: #60a5fa !important;
+}
+.dark .bg-green-50 {
+  background-color: rgba(34, 197, 94, 0.15) !important;
+}
+.dark .text-green-600 {
+  color: #4ade80 !important;
+}
+.dark .bg-red-50 {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+}
+.dark .text-red-600 {
+  color: #f87171 !important;
+}
+.dark .bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+}
+.dark .text-amber-700 {
+  color: #fbbf24 !important;
+}
+.dark .hover\:text-amber-400:hover {
+  color: #fbbf24 !important;
+}
+.dark .bg-cyan-50 {
+  background-color: rgba(6, 182, 212, 0.15) !important;
+}
+.dark .text-cyan-600 {
+  color: #22d3ee !important;
+}
+.dark .hover\:bg-blue-50:hover,
+.dark .hover\:bg-green-50:hover,
+.dark .hover\:bg-red-50:hover,
+.dark .hover\:bg-amber-50:hover,
+.dark .hover\:bg-cyan-50:hover,
+.dark .hover\:bg-gray-50:hover,
+.dark .hover\:bg-gray-100:hover {
+  background-color: var(--accent) !important;
+}
+
+/* 侧边栏 active 状态在暗色下用亮金 */
+.dark aside .bg-\[\#163f3a\]\/10 {
+  background-color: rgba(201, 165, 92, 0.2) !important;
+}
+.dark aside .text-\[\#163f3a\] {
+  color: #c9a55c !important;
+}
+
+/* 按钮/主操作色统一为暖金 */
+.dark .bg-red-600,
+.dark .bg-red-700,
+.dark .bg-\[\#163f3a\] {
+  background-color: #c9a55c !important;
+}
+.dark .hover\:bg-red-700:hover,
+.dark .hover\:bg-\[\#163f3a\]\/80:hover,
+.dark .hover\:bg-\[\#163f3a\]:hover {
+  background-color: #b8944d !important;
+}
+.dark .text-red-50,
+.dark .text-\[\#f6f4ef\] {
+  color: #0f2e2a !important;
+}
+.dark .hover\:text-\[\#163f3a\]:hover {
+  color: #c9a55c !important;
+}
+
+/* 弹窗/浮层面板 */
+.dark .bg-black\/40,
+.dark .bg-black\/50 {
+  background-color: rgba(0, 0, 0, 0.6) !important;
+}
+.dark .bg-black\/40 > div,
+.dark .bg-black\/50 > div {
+  background-color: var(--card) !important;
+  color: var(--card-foreground) !important;
+  border-color: var(--border) !important;
+}
+
+/* 代码/脚本弹窗深色背景 */
+.dark .bg-\[\#1e1e1e\] {
+  background-color: #1e1e1e !important;
+  color: #e5e5e5 !important;
+}
+.dark .text-gray-100 {
+  color: #e5e5e5 !important;
+}
+.dark .text-gray-200 {
+  color: #d4d4d4 !important;
+}
+.dark .text-gray-300 {
+  color: #a3a3a3 !important;
 }

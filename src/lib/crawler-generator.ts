@@ -265,7 +265,7 @@ def main():
     ap.add_argument("--api-url", default=API_URL, help="热点 API 地址")
     ap.add_argument("--token", default=os.environ.get("AUTH_TOKEN", ""), help="API 认证 token")
     ap.add_argument("--dry-run", action="store_true", help="仅预览不写入")
-    args = ap.parse_args()
+    args, _ = ap.parse_known_args()
     mode = "local"
     if args.db:
         mode = "db"

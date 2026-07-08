@@ -224,7 +224,7 @@ def main():
     ap.add_argument("--start", help="起始日期 YYYYMMDD（默认：当日）")
     ap.add_argument("--end", help="结束日期 YYYYMMDD（默认：当日）")
     ap.add_argument("--dry-run", action="store_true", help="仅抓取解析、不入库")
-    args = ap.parse_args()
+    args, _ = ap.parse_known_args()
 
     today = datetime.datetime.now()
     start = args.start or today.strftime("%Y%m%d")

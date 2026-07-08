@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   KeyRound, Plus, Edit3, Trash2, ShieldCheck, AlertCircle, CheckCircle, Power,
+  Globe, Lock,
 } from "lucide-react";
 
 interface ApiKeyItem {
@@ -13,6 +14,8 @@ interface ApiKeyItem {
   models: string[];
   defaultModel: string | null;
   isActive: boolean;
+  isSystem?: boolean;
+  baseUrl?: string | null;
   createdAt: number;
 }
 
@@ -30,11 +33,14 @@ interface ModalState {
   apiKey: string;
   models: string[];
   defaultModel: string;
+  baseUrl: string;
+  isSystem?: boolean;
 }
 
 export default function ApiConfigPanel() {
   const [items, setItems] = useState<ApiKeyItem[]>([]);
   const [providers, setProviders] = useState<ProviderPreset[]>([]);
+  const [isSuper, setIsSuper] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dialog, setDialog] = useState<{ title: string; message: string } | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
@@ -48,6 +54,7 @@ export default function ApiConfigPanel() {
       if (body.success) {
         setItems(body.data);
         setProviders(body.providers || []);
+        setIsSuper(Boolean(body.isSuper));
       }
     } catch {
     } finally {
@@ -66,23 +73,34 @@ export default function ApiConfigPanel() {
   const openAdd = () => {
     const first = providers[0];
     if (!first) return;
-    setModal({ provider: first.id, apiKey: "", models: [...first.models], defaultModel: first.models[0] });
+    setModal({
+      provider: first.id,
+      apiKey: "",
+      models: [...first.models],
+      defaultModel: first.models[0],
+      baseUrl: first.baseURL,
+    });
   };
 
   const openEdit = (item: ApiKeyItem) => {
+    const p = providerById(item.provider);
     setModal({
       id: item.id,
       provider: item.provider,
       apiKey: "",
       models: [...item.models],
       defaultModel: item.defaultModel || item.models[0] || "",
+      baseUrl: item.baseUrl || p?.baseURL || "",
+      isSystem: item.isSystem,
     });
   };
 
   const onProviderChange = (pid: string) => {
     const p = providerById(pid);
     if (!p) return;
-    setModal((m) => (m ? { ...m, provider: pid, models: [...p.models], defaultModel: p.models[0] } : m));
+    setModal((m) =>
+      m ? { ...m, provider: pid, models: [...p.models], defaultModel: p.models[0], baseUrl: p.baseURL } : m
+    );
   };
 
   const toggleModel = (m: string) => {
@@ -111,6 +129,7 @@ export default function ApiConfigPanel() {
         apiKey: modal.apiKey,
         models: modal.models,
         defaultModel: modal.defaultModel,
+        baseUrl: modal.baseUrl,
       }),
     });
     const body = await res.json();
@@ -134,6 +153,10 @@ export default function ApiConfigPanel() {
       showDialog("成功", "已删除");
       setConfirmDelete(null);
       load();
+    } else {
+      const body = await res.json().catch(() => ({}));
+      showDialog("失败", body.error?.message || "删除失败");
+      setConfirmDelete(null);
     }
   };
 
@@ -167,6 +190,7 @@ export default function ApiConfigPanel() {
         <ShieldCheck className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
         <p className="text-xs text-blue-700 leading-relaxed">
           API Key 使用 AES-256-GCM 加密后存储，服务端永不保存明文，界面仅展示掩码（如 <span className="font-mono">sk-****1234</span>）。
+          {isSuper && <span className="ml-1 font-medium">系统默认 MiniCPM 仅超管可改。</span>}
         </p>
       </div>
 
@@ -181,14 +205,20 @@ export default function ApiConfigPanel() {
         <div className="space-y-3">
           {items.map((item) => {
             const p = providerById(item.provider);
+            const canEdit = !item.isSystem || isSuper;
             return (
               <div key={item.id} className="bg-white rounded-xl border border-gray-200 p-4">
                 <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium text-gray-800">{item.label}</span>
                     <span className="text-[10px] text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">
                       {item.provider}
                     </span>
+                    {item.isSystem && (
+                      <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                        <Lock className="w-2.5 h-2.5" /> 系统默认
+                      </span>
+                    )}
                     {item.isActive ? (
                       <span className="text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded">已启用</span>
                     ) : (
@@ -197,24 +227,31 @@ export default function ApiConfigPanel() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
-                      onClick={() => toggleActive(item)}
-                      title={item.isActive ? "点击停用" : "点击启用"}
+                      onClick={() => canEdit && toggleActive(item)}
+                      disabled={!canEdit}
+                      title={item.isSystem && !isSuper ? "系统默认：仅超管可改" : item.isActive ? "点击停用" : "点击启用"}
                       className={`flex items-center gap-1 px-2 py-1 text-[10px] rounded ${
                         item.isActive ? "bg-green-50 text-green-600 hover:bg-green-100" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                      }`}
+                      } ${!canEdit ? "opacity-40 cursor-not-allowed" : ""}`}
                     >
                       <Power className="w-3 h-3" />
                       {item.isActive ? "启用中" : "已停用"}
                     </button>
                     <button
-                      onClick={() => openEdit(item)}
-                      className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 text-[10px] rounded hover:bg-blue-100"
+                      onClick={() => canEdit && openEdit(item)}
+                      disabled={!canEdit}
+                      className={`flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 text-[10px] rounded hover:bg-blue-100 ${
+                        !canEdit ? "opacity-40 cursor-not-allowed" : ""
+                      }`}
                     >
                       <Edit3 className="w-3 h-3" />编辑
                     </button>
                     <button
-                      onClick={() => setConfirmDelete(item)}
-                      className="flex items-center gap-1 px-2 py-1 bg-red-50 text-red-600 text-[10px] rounded hover:bg-red-100"
+                      onClick={() => canEdit && setConfirmDelete(item)}
+                      disabled={!canEdit}
+                      className={`flex items-center gap-1 px-2 py-1 bg-red-50 text-red-600 text-[10px] rounded hover:bg-red-100 ${
+                        !canEdit ? "opacity-40 cursor-not-allowed" : ""
+                      }`}
                     >
                       <Trash2 className="w-3 h-3" />删除
                     </button>
@@ -237,7 +274,10 @@ export default function ApiConfigPanel() {
                   ))}
                 </div>
 
-                {p && <div className="text-[10px] text-gray-400">接口：{p.baseURL}</div>}
+                <div className="flex items-center gap-1 text-[10px] text-gray-400">
+                  <Globe className="w-3 h-3" />
+                  <span className="font-mono truncate">{item.baseUrl || p?.baseURL}</span>
+                </div>
               </div>
             );
           })}
@@ -248,14 +288,17 @@ export default function ApiConfigPanel() {
       {modal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40" onClick={() => setModal(null)}>
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-[520px] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-sm font-medium text-gray-800 mb-4">{modal.id ? "编辑密钥" : "添加密钥"}</h3>
+            <h3 className="text-sm font-medium text-gray-800 mb-4">
+              {modal.id ? (modal.isSystem ? "编辑系统默认密钥" : "编辑密钥") : "添加密钥"}
+            </h3>
 
             <div className="mb-3">
               <label className="block text-xs text-gray-500 mb-1">厂商</label>
               <select
                 value={modal.provider}
                 onChange={(e) => onProviderChange(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-500"
+                disabled={!!modal.id}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-500 disabled:bg-gray-100 disabled:text-gray-400"
               >
                 {providers.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -274,6 +317,19 @@ export default function ApiConfigPanel() {
                 value={modal.apiKey}
                 onChange={(e) => setModal({ ...modal, apiKey: e.target.value })}
                 placeholder="粘贴厂商 API Key"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-500 font-mono"
+              />
+            </div>
+
+            <div className="mb-3">
+              <label className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+                <Globe className="w-3 h-3" /> 接口地址（可覆盖预设）
+              </label>
+              <input
+                type="text"
+                value={modal.baseUrl}
+                onChange={(e) => setModal({ ...modal, baseUrl: e.target.value })}
+                placeholder={providerById(modal.provider)?.baseURL || "https://..."}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-500 font-mono"
               />
             </div>

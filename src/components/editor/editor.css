@@ -52,6 +52,55 @@
   word-break: break-word;
 }
 
+/* 暗色模式：纸面变深，文字变白 */
+.dark .document-page {
+  background: oklch(0.205 0 0);
+  color: oklch(0.95 0 0);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+.dark .document-editor {
+  color: oklch(0.95 0 0);
+}
+.dark .document-editor .ProseMirror p,
+.dark .document-editor .ProseMirror h1,
+.dark .document-editor .ProseMirror h2,
+.dark .document-editor .ProseMirror h3,
+.dark .document-editor .ProseMirror h4,
+.dark .document-editor .ProseMirror h5,
+.dark .document-editor .ProseMirror li {
+  color: oklch(0.95 0 0);
+}
+.dark .document-editor .ProseMirror td,
+.dark .document-editor .ProseMirror th {
+  color: oklch(0.95 0 0);
+  border-color: oklch(0.5 0 0);
+}
+.dark .document-editor .ProseMirror th {
+  background: oklch(0.3 0 0);
+}
+.dark .document-editor .ProseMirror blockquote {
+  border-left-color: oklch(0.5 0 0);
+}
+.dark .de-banji-line,
+.dark .doc-mode-simple .document-editor .official-footer,
+.dark .doc-mode-gb .document-editor .official-footer,
+.dark .doc-mode-official .document-editor .official-footer {
+  border-color: oklch(0.5 0 0);
+}
+.dark .de-banji-left,
+.dark .de-banji-right {
+  color: oklch(0.85 0 0);
+}
+.dark .signature-block p {
+  color: oklch(0.85 0 0);
+}
+.dark .ProseMirror-selectednode {
+  outline-color: #f87171;
+}
+.dark .ProseMirror .selectedCell {
+  background: #451a1a;
+}
+
 /* ================================================================
    简易模式（simple）— 默认，尽量接近国标但排版更宽松
    ================================================================ */

@@ -213,7 +213,7 @@ def main():
     parser.add_argument("--api-url", default="http://localhost:3000/api/hotspots", help="热点 API 地址")
     parser.add_argument("--auth-token", default="", help="API 认证 token")
     parser.add_argument("--dry-run", action="store_true", help="仅预览不写入")
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
 
     config = {
         "name": args.name,
