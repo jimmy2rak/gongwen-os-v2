@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-人民日报 · 理论版+评论版 · 当日自动爬虫
-======================================
-无交互，默认抓取当日，直接上传到公文系统「人民日报」板块。
+人民日报 · 理论版+评论版 · 当日自动爬虫（第二版）
+=================================================
+基于用户验证有效的爬取逻辑重写，重点修复：
+  1. 版面列表选择器兼容
+  2. 文章链接构造（不再用 urljoin，而是按人民日报目录规则拼接）
+  3. 更详细的调试输出，方便定位问题
 
 依赖：pip install requests beautifulsoup4
 运行：
@@ -14,7 +17,6 @@
 
 import os
 import sys
-import re
 import time
 import json
 import datetime
@@ -27,7 +29,7 @@ BACKEND_URL = (os.environ.get("BACKEND_URL") or "https://gongwenos.182183.xyz").
 API_KEY = os.environ.get("CRAWLER_API_KEY") or ""
 UPLOAD_URL = f"{BACKEND_URL}/api/public/crawler/upload"
 SOURCE_NAME = "人民日报"
-COLUMN_ID = "人民日报"  # 前端按此板块渲染
+COLUMN_ID = "人民日报"  # 前端板块名
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -37,8 +39,8 @@ HEADERS = {
 }
 
 
-def fetch_url(url, timeout=15):
-    """请求页面，失败返回空串不中断。"""
+def fetch(url, timeout=15):
+    """请求页面，失败返回空串。"""
     try:
         r = requests.get(url, headers=HEADERS, timeout=timeout)
         r.raise_for_status()
@@ -49,21 +51,53 @@ def fetch_url(url, timeout=15):
         return ""
 
 
+def build_layout_url(year, month, day):
+    return f"http://paper.people.com.cn/rmrb/pc/layout/{year}{month}/{day}/node_01.html"
+
+
+def build_page_url(year, month, day, href):
+    """版面页链接：href 如 node_05.html。"""
+    if href.startswith("http"):
+        return href
+    base = f"http://paper.people.com.cn/rmrb/pc/layout/{year}{month}/{day}/"
+    return urljoin(base, href)
+
+
+def build_article_url(year, month, day, href):
+    """文章详情页链接：href 通常包含 content。"""
+    if href.startswith("http"):
+        return href
+    base = f"http://paper.people.com.cn/rmrb/pc/content/{year}{month}/{day}/"
+    return urljoin(base, href)
+
+
 def get_page_list(year, month, day):
-    """获取当日版面列表，仅保留含「理论/评论」的版面。"""
-    base_url = f"http://paper.people.com.cn/rmrb/pc/layout/{year}{month}/{day}/node_01.html"
-    html = fetch_url(base_url)
+    """获取版面列表，仅保留含「理论」或「评论」的版面。"""
+    layout_url = build_layout_url(year, month, day)
+    print(f"\n📰 拉取版面列表页：{layout_url}")
+    html = fetch(layout_url)
     if not html:
+        print("  ⚠️ 版面列表页为空，可能日期尚未发布或网络错误")
         return []
+
     bs = BeautifulSoup(html, "html.parser")
+
+    # 多种版面容器兜底
     page_items = []
     page_list = bs.find("div", id="pageList")
-    if page_list and page_list.ul:
-        page_items = page_list.ul.find_all("div", class_="right_title-name")
-    else:
+    if page_list:
+        if page_list.ul:
+            page_items = page_list.ul.find_all("div", class_="right_title-name")
+        else:
+            page_items = page_list.find_all("div", class_="right_title-name")
+    if not page_items:
         swiper = bs.find("div", class_="swiper-container")
         if swiper:
             page_items = swiper.find_all("div", class_="swiper-slide")
+    if not page_items:
+        page_items = bs.select("#pageList .right_title-name")
+
+    print(f"  共找到 {len(page_items)} 个版面候选")
 
     res = []
     for item in page_items:
@@ -74,53 +108,68 @@ def get_page_list(year, month, day):
         href = a.get("href", "")
         if not href:
             continue
-        full_link = urljoin(base_url, href)
+        full_link = build_page_url(year, month, day, href)
         print(f"  🔍 识别版面：{p_name}")
-        if "评论" in p_name or "理论" in p_name:
+        if "理论" in p_name or "评论" in p_name:
             res.append((p_name, full_link))
             print(f"  ✅ 选中目标版面：{p_name}")
     return res
 
 
 def get_article_urls(year, month, day, page_url):
-    """获取某版面下的文章链接。"""
-    html = fetch_url(page_url)
+    """获取某版面页下的文章详情链接。"""
+    html = fetch(page_url)
     if not html:
+        print(f"  ⚠️ 版面页为空：{page_url}")
         return []
+
     bs = BeautifulSoup(html, "html.parser")
+
     li_list = []
     title_list = bs.find("div", id="titleList")
     if title_list and title_list.ul:
         li_list = title_list.ul.find_all("li")
-    else:
+    if not li_list:
         news_list = bs.find("ul", class_="news-list")
         if news_list:
             li_list = news_list.find_all("li")
+    if not li_list:
+        li_list = bs.select("#titleList ul li")
+
+    print(f"  版面页找到 {len(li_list)} 个 li 候选")
 
     art_links = []
     for li in li_list:
         for a in li.find_all("a"):
-            link = a.get("href", "")
-            if "content" in link:
-                art_url = urljoin(page_url, link)
+            href = a.get("href", "")
+            if not href or "content" not in href:
+                continue
+            art_url = build_article_url(year, month, day, href)
+            if art_url not in art_links:
                 art_links.append(art_url)
+    print(f"  提取到 {len(art_links)} 篇文章链接")
     return art_links
 
 
 def parse_article(html):
-    """解析单篇：标题 + 纯文本 + TipTap 兼容 HTML。"""
+    """解析文章标题与正文。"""
     if not html:
         return None
     bs = BeautifulSoup(html, "html.parser")
 
-    # 标题：按 h3/h1/h2 顺序拼接
-    title_parts = []
+    # 标题：按 h3/h1/h2 顺序尝试
+    title = ""
     for tag in [bs.h3, bs.h1, bs.h2]:
         if tag:
             txt = tag.get_text(strip=True)
-            if txt and txt not in title_parts:
-                title_parts.append(txt)
-    title = " ".join(title_parts)
+            if txt:
+                title = txt
+                break
+
+    if not title:
+        # 兜底：尝试 title 标签
+        if bs.title:
+            title = bs.title.get_text(strip=True)
 
     # 正文
     content_box = bs.find("div", id="ozoom")
@@ -134,9 +183,16 @@ def parse_article(html):
             if txt:
                 paragraphs.append(txt)
         body_html = "".join(str(c) for c in content_box.children)
+    else:
+        # 兜底：取 body 内所有 p
+        for p in bs.find_all("p"):
+            txt = p.get_text(strip=True)
+            if txt:
+                paragraphs.append(txt)
 
     content_plain = "\n".join(paragraphs)
     content_html = "".join(f"<p>{p}</p>" for p in paragraphs)
+
     return {
         "title": title,
         "content_plain": content_plain,
@@ -181,6 +237,7 @@ def upload_article(article, page_name, art_url, crawl_date):
 def crawl_today():
     if not API_KEY:
         print("❌ 请设置环境变量 CRAWLER_API_KEY（X-Crawler-Auth 密钥）")
+        print("   获取方式：系统设置 → 爬虫热点推送配置 → 生成脚本 → 复制密钥")
         sys.exit(1)
 
     today = datetime.datetime.now()
@@ -194,21 +251,26 @@ def crawl_today():
 
     pages = get_page_list(year, month, day)
     if not pages:
-        print(f"⚠️ 【{date_str}】未匹配到理论/评论版面")
+        print(f"\n⚠️ 【{date_str}】未匹配到理论/评论版面，可能原因：")
+        print("   1. 当日报纸尚未上线（通常清晨 6~8 点后）")
+        print("   2. 网络或页面结构变化")
+        print("   3. 日期格式或 URL 模板已过期")
         return
 
     total = 0
     for page_name, page_link in pages:
+        print(f"\n📄 进入版面：{page_name}")
         urls = get_article_urls(year, month, day, page_link)
         if not urls:
-            print(f"  📭 版面 {page_name} 无文章链接")
+            print(f"  📭 该版面无文章链接")
             continue
         for art_url in urls:
-            html = fetch_url(art_url)
+            html = fetch(art_url)
             art = parse_article(html)
             if not art or not art["title"]:
+                print(f"  ⚠️ 无法解析文章：{art_url}")
                 continue
-            print(f"  📝 抓取文章：{art['title'][:30]}")
+            print(f"  📝 抓取文章：{art['title'][:40]}")
             if upload_article(art, page_name, art_url, date_str):
                 total += 1
             time.sleep(1)
