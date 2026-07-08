@@ -1,16 +1,53 @@
 // ─── 爬虫热点推送配置面板（仅超级管理员可见）──────
-// 区域1：新增数据源表单（名称 / 抓取根URL / 栏目下拉 / 标签）
-// 区域2：数据源列表（编辑 / 删除 / 生成一键爬虫脚本）
-// 区域3：生成脚本弹窗（大文本框展示完整 .py + 复制 + 下载 crawler_task_{id}.py）
+// 区域1：内置模板快速载入
+// 区域2：新增数据源表单（名称 / 抓取根URL / 栏目下拉 / 标签）
+// 区域3：数据源列表（编辑 / 删除 / 生成一键爬虫脚本）
+// 区域4：生成脚本弹窗（大文本框展示完整 .py + 复制 + 下载 crawler_task_{id}.py）
 
 "use client";
 
 import { useEffect, useState } from "react";
 import {
   Plus, Trash2, Pencil, X, Check, Globe, Copy, Download, Code2, Terminal,
+  BookTemplate,
 } from "lucide-react";
 import { CustomDialog } from "@/components/ui/CustomDialog";
 import { getAllCategories } from "@/types";
+
+// ── 内置模板预设 ────────────────────────────────
+interface BuiltinPreset {
+  sourceName: string;
+  baseUrl: string;
+  categoryTag: string;
+  description: string;
+}
+
+const BUILTIN_PRESETS: BuiltinPreset[] = [
+  {
+    sourceName: "人民日报",
+    baseUrl: "http://paper.people.com.cn/rmrb/pc/layout",
+    categoryTag: "时政",
+    description: "人民日报电子版 · 理论版/评论版定向抓取",
+  },
+  {
+    sourceName: "新华网",
+    baseUrl: "http://www.xinhuanet.com/politics/",
+    categoryTag: "时政",
+    description: "新华网时政频道",
+  },
+  {
+    sourceName: "中国政府网",
+    baseUrl: "https://www.gov.cn/",
+    categoryTag: "政务",
+    description: "中央人民政府门户网站",
+  },
+  {
+    sourceName: "求是网",
+    baseUrl: "http://www.qstheory.cn/",
+    categoryTag: "党建",
+    description: "求是杂志社官网 · 理论文章",
+  },
+];
 
 interface CrawlerSource {
   id: string;
@@ -46,6 +83,22 @@ export default function CrawlerAdminPanel() {
   const [genCopyOk, setGenCopyOk] = useState(false);
 
   const allCats = getAllCategories();
+
+  // ── 内置模板载入 ──
+  const loadPreset = (preset: BuiltinPreset) => {
+    setForm({
+      sourceName: preset.sourceName,
+      baseUrl: preset.baseUrl,
+      targetColumnId: allCats.includes(preset.categoryTag) ? preset.categoryTag : "",
+      categoryTag: preset.categoryTag,
+      enable: true,
+    });
+    setEditing(null);
+    setShowForm(true);
+  };
+
+  // 检查某数据源是否已存在
+  const isSourceAlreadyAdded = (name: string) => list.some((s) => s.sourceName === name);
 
   // ── 拉取数据源（超管接口，普通用户会被 403 拒绝）──
   const loadData = () => {
@@ -157,6 +210,35 @@ export default function CrawlerAdminPanel() {
         </button>
       </div>
 
+      {/* ── 内置模板快速载入 ── */}
+      <div className="mb-5 border border-dashed border-[#163f3a]/20 rounded-xl p-4 bg-[#f6f4ef]">
+        <div className="flex items-center gap-2 mb-3">
+          <BookTemplate className="w-4 h-4 text-[#163f3a]" />
+          <span className="text-xs font-medium text-gray-700">内置模板</span>
+          <span className="text-[10px] text-gray-400">点击模板自动填入表单，保存即生效</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {BUILTIN_PRESETS.map((p) => (
+            <button
+              key={p.sourceName}
+              onClick={() => loadPreset(p)}
+              disabled={isSourceAlreadyAdded(p.sourceName)}
+              title={isSourceAlreadyAdded(p.sourceName) ? `${p.sourceName} 已存在` : p.description}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs bg-white border border-gray-200 rounded-lg
+                         hover:border-[#163f3a]/40 hover:bg-[#163f3a]/5 transition-colors
+                         disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Globe className="w-3.5 h-3.5 text-gray-400" />
+              <span className="text-gray-700">{p.sourceName}</span>
+              <span className="text-[9px] text-gray-400 bg-gray-100 px-1 rounded">{p.categoryTag}</span>
+              {isSourceAlreadyAdded(p.sourceName) && (
+                <span className="text-[9px] text-green-600 ml-0.5">已添加</span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* 数据源列表 */}
       {loading ? (
         <div className="text-center py-10 text-sm text-gray-400">加载中…</div>
@@ -166,13 +248,18 @@ export default function CrawlerAdminPanel() {
         </div>
       ) : (
         <div className="space-y-2">
-          {list.map((s) => (
+          {list.map((s) => {
+            const isBuiltin = BUILTIN_PRESETS.some((p) => p.sourceName === s.sourceName);
+            return (
             <div key={s.id} className="p-3 bg-white rounded-lg border border-gray-200">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <Globe className="w-4 h-4 text-gray-400" />
                     <span className="text-sm font-medium text-gray-800">{s.sourceName}</span>
+                    {isBuiltin && (
+                      <span className="text-[9px] text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">内置</span>
+                    )}
                     <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
                       {s.targetColumnId || "未绑定栏目"}
                     </span>
@@ -193,14 +280,17 @@ export default function CrawlerAdminPanel() {
                     className="p-1.5 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50" title="编辑">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
+                  {!isBuiltin && (
                   <button onClick={() => setConfirmDel(s)}
                     className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50" title="删除">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
+                  )}
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

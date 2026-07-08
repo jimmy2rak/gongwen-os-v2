@@ -1,9 +1,9 @@
 // ─── 首页总览仪表盘 ────────────────────────────
-// 实时同步显示：文档总数、待审阅数、已审阅(知识库)数、模板+Skill数 等
+// 使用 stale-while-revalidate 本地缓存，导航回首页不闪烁加载。
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import Link from "next/link";
 import {
@@ -11,25 +11,42 @@ import {
   TrendingUp, Clock, ArrowRight, BookOpen, PenSquare,
 } from "lucide-react";
 
+interface CacheItem {
+  data: any;
+  fetchedAt: number;
+}
+const _cache = new Map<string, CacheItem>();
+const STALE_MS = 30_000; // 30 秒内不重新请求
+
+function cachedFetch(key: string, fetcher: () => Promise<any>): Promise<any> {
+  const hit = _cache.get(key);
+  if (hit && Date.now() - hit.fetchedAt < STALE_MS) {
+    return Promise.resolve(hit.data);
+  }
+  return fetcher().then((d) => {
+    _cache.set(key, { data: d, fetchedAt: Date.now() });
+    return d;
+  });
+}
+
 export default function HomePage() {
   const [stats, setStats] = useState({
-    totalDocs: 0,
-    pendingReview: 0,
-    reviewed: 0,
-    templates: 0,
-    skills: 0,
+    totalDocs: 0, pendingReview: 0, reviewed: 0, templates: 0, skills: 0,
   });
   const [loading, setLoading] = useState(true);
   const [recentDocs, setRecentDocs] = useState<any[]>([]);
+  const mounted = useRef(true);
 
   useEffect(() => {
+    mounted.current = true;
     Promise.all([
-      fetch("/api/documents?pageSize=1").then((r) => r.json()),
-      fetch("/api/documents?reviewed=true&pageSize=100").then((r) => r.json()).catch(() => ({ success: false })),
-      fetch("/api/documents?reviewed=false&pageSize=100").then((r) => r.json()).catch(() => ({ success: false })),
-      fetch("/api/templates").then((r) => r.json()),
-      fetch("/api/skills").then((r) => r.json()),
+      cachedFetch("docs:1", () => fetch("/api/documents?pageSize=1").then((r) => r.json())),
+      cachedFetch("docs:reviewed", () => fetch("/api/documents?reviewed=true&pageSize=100").then((r) => r.json()).catch(() => ({ success: false }))),
+      cachedFetch("docs:pending", () => fetch("/api/documents?reviewed=false&pageSize=100").then((r) => r.json()).catch(() => ({ success: false }))),
+      cachedFetch("templates", () => fetch("/api/templates").then((r) => r.json())),
+      cachedFetch("skills", () => fetch("/api/skills").then((r) => r.json())),
     ]).then(([docRes, reviewedRes, pendingRes, tplRes, skillRes]) => {
+      if (!mounted.current) return;
       const allDocs = docRes.success ? (docRes.data?.items || docRes.data || []) : [];
       const docTotal = docRes.meta?.total ?? allDocs.length;
       const reviewedDocs = reviewedRes.success ? (reviewedRes.data?.items || reviewedRes.data || []) : [];
@@ -44,10 +61,10 @@ export default function HomePage() {
         templates: 11 + allTpls.length,
         skills: allSkills.length,
       });
-
       setRecentDocs(allDocs.slice(0, 5));
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(() => { if (mounted.current) setLoading(false); });
+    return () => { mounted.current = false; };
   }, []);
 
   const cards = [
@@ -58,12 +75,24 @@ export default function HomePage() {
     { label: "Skill 规范", value: stats.skills, icon: Sparkles, color: "#0891b2", bg: "#ecfeff", href: "/settings?tab=skill" },
   ];
 
+  const SkeletonCard = () => (
+    <div className="bg-white rounded-xl border border-[#e7e2d8] p-4 animate-pulse">
+      <div className="w-8 h-8 rounded-lg bg-gray-200 mb-3" />
+      <div className="h-7 w-16 bg-gray-200 rounded mb-1" />
+      <div className="h-3 w-12 bg-gray-100 rounded" />
+    </div>
+  );
+
   return (
     <DashboardLayout title="首页">
       <div className="p-6 max-w-6xl mx-auto space-y-6">
         {/* 统计卡片 */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {cards.map((c) => (
+          {loading ? (
+            <>
+              <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
+            </>
+          ) : cards.map((c) => (
             <Link key={c.label} href={c.href}
               className="block bg-white rounded-xl border border-[#e7e2d8] p-4 hover:shadow-sm transition-shadow group">
               <div className="flex items-center justify-between mb-3">
@@ -72,7 +101,7 @@ export default function HomePage() {
                 </div>
                 <ArrowRight className="w-3.5 h-3.5 text-gray-200 group-hover:text-gray-400 transition-colors" />
               </div>
-              <p className="text-2xl font-bold text-gray-800">{loading ? "—" : c.value}</p>
+              <p className="text-2xl font-bold text-gray-800">{c.value}</p>
               <p className="text-xs text-gray-500 mt-0.5">{c.label}</p>
             </Link>
           ))}

@@ -66,17 +66,18 @@
 - [x] `docs/crawler-hotspot-implementation.md` 六板块完整文档
 
 ### 上线部署
-- [ ] GitHub 仓库推送到 Vercel 自动部署
-- [ ] Turso 数据库创建 + `drizzle-kit push` schema 迁移
-- [ ] 本地 data.db 已有数据迁移至 Turso
-- [ ] Vercel 环境变量全部配置完毕
-- [ ] Cloudflare 接入 `182183.xyz` → DNS 指向 Vercel（CNAME → cname.vercel-dns.com）
-- [ ] `next build` 生产构建通过
-- [ ] SSL/HTTPS 自动生效
-- [ ] 注册 → 登录 → 创建文档全流程验证通过
-- [ ] AI 对话功能在生产环境验证通过
-- [ ] 爬虫配置页面（超管）在生产环境可访问
-- [ ] 爬虫上传接口 401 鉴权校验正常
+- [x] GitHub 仓库推送到 Vercel 自动部署
+- [x] Turso 数据库创建 + `drizzle-kit push` schema 迁移
+- [x] 本地 data.db 已有数据迁移至 Turso
+- [x] Vercel 环境变量全部配置完毕
+- [x] 域名 `gongwenos.182183.xyz` 解析并绑定 Vercel（CNAME）
+- [x] `next build` 生产构建通过
+- [x] SSL/HTTPS 自动生效
+- [x] 爬虫密钥加密写入 Turso（`sys_secret_config`）
+- [ ] 登录 / 创建文档全流程验证
+- [ ] AI 对话功能在生产环境验证
+- [ ] 爬虫配置页面（超管）测试
+- [ ] 爬虫上传接口 401 鉴权校验
 
 ---
 

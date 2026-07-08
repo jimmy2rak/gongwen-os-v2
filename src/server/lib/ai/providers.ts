@@ -1,5 +1,5 @@
 // ─── AI 厂商预设 ─────────────────────────────────
-// 6 家预设厂商，均走 OpenAI 兼容 /chat/completions 接口（stream 模式）。
+// 8 家预设厂商，均走 OpenAI 兼容 /chat/completions 接口（stream 模式）。
 export interface ProviderPreset {
   id: string;
   label: string;
@@ -49,6 +49,28 @@ export const AI_PROVIDERS: ProviderPreset[] = [
     label: "智谱 GLM",
     baseURL: "https://open.bigmodel.cn/api/paas/v4",
     models: ["glm-4-plus", "glm-4-air", "glm-4-flash"],
+    openaiCompatible: true,
+  },
+  {
+    id: "nvidia",
+    label: "NVIDIA",
+    baseURL: "https://integrate.api.nvidia.com/v1",
+    models: [
+      "nvidia/llama-3.1-nemotron-70b-instruct",
+      "nvidia/mistral-nemo-minitron-8b-base",
+      "nvidia/mixtral-8x22b-instruct-v0.1",
+    ],
+    openaiCompatible: true,
+  },
+  {
+    id: "minicpm",
+    label: "MiniCPM (面壁智能)",
+    baseURL: "https://api.modelbest.co/v1",
+    models: [
+      "MiniCPM-V-4.6-Instruct",
+      "MiniCPM-V-4.6-Thinking",
+      "MiniCPM-o-4.5",
+    ],
     openaiCompatible: true,
   },
 ];

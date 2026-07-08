@@ -1,10 +1,9 @@
 // ─── 爬虫热点文章展示页（读取 hot_article）────────
-// 功能：栏目/来源筛选、iframe 全屏原文预览（非弹窗）、导出、编辑为文档、
-//       收藏转文档（提示选择公文类型并入库文档管理）。
+// 使用 stale-while-revalidate 缓存 + 骨架屏异步加载。
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ExportMenu } from "@/components/editor/ExportMenu";
 import { getAllCategories } from "@/types";
@@ -14,6 +13,16 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toggleFavorite } from "@/lib/favorite-store";
+
+interface CacheItem { data: any; fetchedAt: number; }
+const _cache = new Map<string, CacheItem>();
+const STALE_MS = 30_000;
+
+function cachedFetch(key: string, fetcher: () => Promise<any>): Promise<any> {
+  const hit = _cache.get(key);
+  if (hit && Date.now() - hit.fetchedAt < STALE_MS) return Promise.resolve(hit.data);
+  return fetcher().then((d) => { _cache.set(key, { data: d, fetchedAt: Date.now() }); return d; });
+}
 
 interface HotArticleItem {
   id: string;
@@ -45,24 +54,27 @@ export default function HotArticlesPage() {
   const [favCat, setFavCat] = useState<string>("通知");
 
   const allCats = getAllCategories();
+  const mounted = useRef(true);
 
   const showToast = (type: "success" | "error", msg: string) => {
     setToast({ type, msg });
     setTimeout(() => setToast(null), 2500);
   };
 
-  const loadData = () => {
+  const loadData = (skipCache = false) => {
     setLoading(true);
     const qs = new URLSearchParams();
     if (activeCol) qs.set("columnId", activeCol);
     if (activeSrc) qs.set("sourceId", activeSrc);
-    fetch(`/api/hot-articles?${qs.toString()}`)
-      .then((r) => r.json())
-      .then((b) => { if (b.success) setItems((b.data as HotArticleItem[]) || []); })
+    const url = `/api/hot-articles?${qs.toString()}`;
+    const fetchFn = () => fetch(url).then((r) => r.json());
+    const promise = skipCache ? fetchFn() : cachedFetch(url, fetchFn);
+    promise
+      .then((b) => { if (mounted.current && b.success) setItems((b.data as HotArticleItem[]) || []); })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => { if (mounted.current) setLoading(false); });
   };
-  useEffect(() => { loadData(); }, [activeCol, activeSrc]);
+  useEffect(() => { mounted.current = true; loadData(); return () => { mounted.current = false; }; }, [activeCol, activeSrc]);
 
   // 去重后的筛选选项
   const cols = Array.from(new Set(items.map((i) => i.columnId).filter(Boolean) as string[])).sort();
@@ -141,7 +153,7 @@ export default function HotArticlesPage() {
             <h2 className="text-base font-semibold text-gray-800">爬虫热点文章</h2>
             <p className="text-xs text-gray-400 mt-1">超管爬虫自动入库 · 支持收藏为文档 / 全屏预览</p>
           </div>
-          <button onClick={loadData}
+          <button onClick={() => loadData(true)}
             className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
             <RefreshCw className="w-3 h-3" /> 刷新
           </button>
@@ -163,7 +175,28 @@ export default function HotArticlesPage() {
 
         {/* 列表 */}
         {loading ? (
-          <div className="text-center py-16 text-sm text-gray-400">加载中...</div>
+          <div className="space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="bg-white rounded-xl border border-[#e7e2d8] p-4 animate-pulse">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+                    <div className="h-3 bg-gray-100 rounded w-full mb-1" />
+                    <div className="h-3 bg-gray-100 rounded w-1/2" />
+                    <div className="flex gap-3 mt-2">
+                      <div className="h-3 w-20 bg-gray-100 rounded" />
+                      <div className="h-3 w-16 bg-gray-100 rounded" />
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <div className="w-7 h-7 bg-gray-100 rounded" />
+                    <div className="w-7 h-7 bg-gray-100 rounded" />
+                    <div className="w-7 h-7 bg-gray-100 rounded" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : items.length === 0 ? (
           <div className="text-center py-16 bg-gray-50/80 rounded-xl border border-dashed border-gray-200">
             <Newspaper className="w-10 h-10 text-gray-200 mx-auto mb-3" />
