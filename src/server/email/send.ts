@@ -46,7 +46,7 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
 
 /** 发送密码重置邮件 */
 export async function sendPasswordResetEmail(to: string, token: string): Promise<boolean> {
-  const url = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/reset-password?token=${token}`;
+  const url = `${process.env.NEXTAUTH_URL || "https://gongwenos.182183.xyz"}/reset-password?token=${token}`;
   return sendEmail(
     to,
     "【公文 OS】重置密码",

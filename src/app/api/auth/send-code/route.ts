@@ -53,7 +53,8 @@ export async function POST(req: NextRequest) {
     });
 
     // 发送邮件（验证码 + Magic Link）
-    const magicUrl = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/auth/magic-link?token=${magicToken}`;
+    const baseUrl = process.env.NEXTAUTH_URL || "https://gongwenos.182183.xyz";
+    const magicUrl = `${baseUrl}/auth/magic-link?token=${magicToken}`;
     await sendLoginCodeEmail(email, code, magicUrl);
 
     return NextResponse.json({ success: true, message: "验证码已发送到邮箱" });
