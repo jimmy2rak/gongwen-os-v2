@@ -83,6 +83,25 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, [store.docId, store.title, store.content]);
 
+  // ─── 键盘快捷键（必须在 early return 前声明，避免 hooks 违反） ──
+  const handleSaveRef = useRef<() => Promise<void>>(async () => {});
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        handleSaveRef.current();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "n") {
+        e.preventDefault();
+        store.setShowNewDocDialog(true);
+        setNewDocCat(null);
+        setSelectedTplId("");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // ─── 从 URL 加载文档（URL 格式：/documents/[id]） ──
   useEffect(() => {
     if (!user) return;
@@ -346,6 +365,8 @@ export default function HomePage() {
       store.setIsSaving(false);
     }
   };
+  // 更新键盘快捷键 ref（必须在 early return 后赋真实函数）
+  handleSaveRef.current = handleSave;
 
   // ─── 审阅 ──────────────────────────────────────
   const handleReview = async (reviewerId: string, reviewerName: string, isApproved: boolean) => {
@@ -381,24 +402,6 @@ export default function HomePage() {
       showDialog("审阅失败", "审阅操作失败，请检查网络");
     }
   };
-
-  // ─── 键盘快捷键 ──────────────────────────────
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault();
-        handleSave();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === "n") {
-        e.preventDefault();
-        store.setShowNewDocDialog(true);
-        setNewDocCat(null);
-        setSelectedTplId("");
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSave]);
 
   // ─── 导出（已迁移至 ExportMenu 组件） ─────────
   // handleExport 由 ExportMenu 组件内部实现
