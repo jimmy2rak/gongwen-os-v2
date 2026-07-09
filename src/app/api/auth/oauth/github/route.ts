@@ -25,13 +25,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: { code: "NOT_CONFIGURED", message: "GitHub OAuth 未配置" } }, { status: 500 });
     }
 
-    // 1. 用 code 换 access_token
+    // 1. 用 code 换 access_token（必须传 redirect_uri，与授权请求一致）
+    const redirectUri = `${req.nextUrl.origin}/auth/callback/github`;
     const tokenRes = await fetch(GITHUB_TOKEN_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code }),
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code, redirect_uri: redirectUri }),
     });
     const tokenData = await tokenRes.json();
+    if (tokenData.error) {
+      console.error("[oauth/github] token exchange error:", tokenData.error, tokenData.error_description);
+      return NextResponse.json({ success: false, error: { code: "OAUTH_ERROR", message: `GitHub 授权失败：${tokenData.error_description || tokenData.error}` } }, { status: 401 });
+    }
     const accessToken = tokenData.access_token;
     if (!accessToken) {
       return NextResponse.json({ success: false, error: { code: "OAUTH_ERROR", message: "GitHub 授权失败" } }, { status: 401 });
