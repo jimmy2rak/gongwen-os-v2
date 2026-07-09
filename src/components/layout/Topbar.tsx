@@ -84,7 +84,10 @@ export function Topbar({
   const ThemeIcon = themeMode === "light" ? Sun : themeMode === "dark" ? Moon : Monitor;
 
   return (
-    <header className="h-14 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-4">
+    <header
+      className="min-h-14 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-4"
+      style={{ paddingTop: "env(safe-area-inset-top)" }}
+    >
       {/* 左侧：菜单按钮 + 标题 + 工具栏插槽 */}
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <button
