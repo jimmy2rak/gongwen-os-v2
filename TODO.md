@@ -1,7 +1,7 @@
 # GongWen-OS v2 — 开发 TODO
 
 > ⛔ **红线**：所有改动只在 `gongwen-os-v2/src/**`。`../GongWen-OS/` 已弃用，改它无效。
-> 📌 **最近更新**：2026-07-09（认证系统开发）
+> 📌 **最近更新**：2026-07-09（验证码/Magic Link 登录上线，GitHub/Google OAuth 暂停）
 
 ---
 
@@ -79,6 +79,16 @@
 - [ ] 爬虫配置页面（超管）测试
 - [ ] 爬虫上传接口 401 鉴权校验
 
+### 验证码 / Magic Link 登录系统
+- [x] `POST /api/auth/send-code` — 发送 6 位验证码 + Magic Link 到邮箱
+- [x] `POST /api/auth/verify-code` — 验证 6 位数字码，通过后直接签发 JWT 登录
+- [x] `POST /api/auth/magic-login` — 验证 Magic Link token，通过后直接签发 JWT 登录
+- [x] `/auth/magic-link` — Magic Link 自动登录回调页
+- [x] 登录页新增"验证码"tab：邮箱 + 发送按钮 + 60s 倒计时 + 6 位数字输入框
+- [x] 复用 `verification_tokens` 表（`otp` / `magic_link` 类型），10 分钟过期
+- [x] 验证码/自动创建用户（邮箱首次登录自动注册）
+- [x] 删除 GitHub/Google OAuth 前端 UI 和后端代码
+
 ---
 
 ## 🚧 开发中 / 待确认
@@ -87,6 +97,8 @@
 |------|------|------|
 | T2 侧边栏/顶栏显示默认画像状态 | ⏳ 待做 | TODO 原规划，工作量小 |
 | 设置页"菜单可见性"tab | ⏳ 待做 | 设置为 ready: false |
+| 🔴 **GitHub/Google OAuth 登录** | 🚫 **暂停** | Brevo SMTP Key 认证失败（535 Authentication failed），导致邮件发送不可用；OAuth 回调流程缺少完整部署环境验证。等待 Brevo SMTP Key 问题解决后再恢复 |
+| 🔴 **Brevo 邮件发送** | 🐛 **修复中** | SMTP Key（xsmtpsib-...）认证失败，需在 Brevo 后台重新创建 SMTP Key，并验证发件人邮箱 `noreply@gongwenos.182183.xyz` 或改用已验证的个人邮箱 |
 
 ---
 
