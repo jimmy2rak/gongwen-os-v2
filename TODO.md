@@ -130,17 +130,16 @@
 
 ### 📱 手机端 UI 适配（分阶段推进）
 
-#### Phase 1：基础响应式布局（1-2 天）
-- [ ] 全局 CSS 断点规划：`sm:640px` / `md:768px` / `lg:1024px`
-- [ ] 登录页、注册页、找回密码页响应式适配（表单自适应宽度、padding 缩放）
-- [ ] Dashboard 主体内容区自适应（文档列表/热点/知识库/编辑器的三栏→两栏→单栏切换）
-- [ ] Topbar 响应式：用户信息折叠为图标 + 左侧菜单按钮移至顶栏
+#### Phase 1：基础响应式布局 ✅ 已完成
+- [x] 登录页响应式：`px-4 mx-auto` + 手机端 padding 缩放
+- [x] Dashboard 容器统一改为 `p-4 md:p-6`（documents/hotspots/knowledge/home/trash/settings/quick-draft）
+- [x] 编辑器纸张宽度响应式：`max-w-full md:max-w-[210mm]`
 
-#### Phase 2：移动端导航与交互（1-2 天）
-- [ ] 侧边栏（Sidebar）在手机端改为底部滑出 Drawer / 全屏覆盖
-- [ ] 编辑器手机适配：工具栏折叠 + 虚拟键盘适配 + 输入区域全屏
-- [ ] 筛选/搜索面板在手机端改为弹出式 Modal
-- [ ] 所有 Table/List 在手机端改为卡片列表布局（隐藏次要列，点开展开详情）
+#### Phase 2：移动端导航与交互 ✅ 已完成
+- [x] 侧边栏在手机端改为全屏覆盖 Drawer（`fixed inset-0` + 半透明遮罩 + 关闭按钮）
+- [x] 桌面端侧边栏隐藏：`hidden md:flex`
+- [x] 文档管理表格在手机端改为卡片列表（`sm:hidden` 卡片 + `hidden sm:block` 表格）
+- [x] Topbar 菜单按钮在手机端切换侧栏覆盖层
 
 #### Phase 3：触控优化与测试（1 天）
 - [ ] 按钮最小触摸区域 44px

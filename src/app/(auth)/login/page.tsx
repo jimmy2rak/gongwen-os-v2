@@ -154,8 +154,8 @@ function AuthContent() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+      <div className="w-full max-w-sm px-4 mx-auto">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8">
           {/* Logo */}
           <div className="flex flex-col items-center mb-6">
             <div className="w-12 h-12 rounded-xl bg-[#163f3a] flex items-center justify-center mb-3">

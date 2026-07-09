@@ -56,7 +56,7 @@ export default function SettingsPage() {
 
   return (
     <DashboardLayout title="系统设置">
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="p-4 md:p-6 max-w-6xl mx-auto">
         <div className="flex gap-6">
           <aside className="w-56 flex-shrink-0">
             <div className="flex items-center gap-1.5 px-3 mb-2 text-xs text-gray-400">

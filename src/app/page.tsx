@@ -558,7 +558,7 @@ export default function HomePage() {
           {/* 编辑区（纸面） */}
           <div className="flex-1 overflow-auto bg-gray-100">
             <div className="flex items-start justify-center py-4">
-              <div className="w-full max-w-[210mm]">
+              <div className="w-full max-w-full md:max-w-[210mm]">
                 <DocEditor
                   content={store.content}
                   onChange={store.setContent}

@@ -98,7 +98,7 @@ export default function KnowledgePage() {
 
   return (
     <DashboardLayout title="公文知识库">
-      <div className="p-6 max-w-6xl mx-auto space-y-4">
+      <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-4">
         {/* 头部 */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs text-gray-500">

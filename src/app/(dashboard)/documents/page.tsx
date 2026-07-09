@@ -326,7 +326,7 @@ export default function DocumentsPage() {
 
   return (
     <DashboardLayout title="文档管理">
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="p-4 md:p-6 max-w-6xl mx-auto">
         {/* 工具栏 */}
         <div className="flex items-center gap-3 mb-4">
           <div className="relative flex-1 max-w-sm" style={{ cursor: "default" }}>
@@ -473,9 +473,11 @@ export default function DocumentsPage() {
           </div>
         )}
 
-        {/* 文档表格 */}
+        {/* 文档表格 — 桌面端 */}
         {!loading && !error && docs.length > 0 && (
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <>
+          {/* 桌面端表格 */}
+          <div className="hidden sm:block bg-white border border-gray-200 rounded-xl overflow-hidden">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[#c9a55c]/10 bg-[#c9a55c]/[0.06]">
@@ -597,6 +599,75 @@ export default function DocumentsPage() {
               </tbody>
             </table>
           </div>
+
+          {/* 移动端卡片列表 */}
+          <div className="sm:hidden space-y-2">
+            {sortDocs(favFilter ? docs.filter((d) => favIds.has(d.id)) : docs).map((doc) => {
+              const isSelected = selected.has(doc.id);
+              return (
+                <div key={doc.id} className={`bg-white border border-gray-200 rounded-lg p-3 transition-colors ${isSelected ? "bg-red-50/50 border-red-200" : ""}`}>
+                  {/* 顶部：标题 + 复选框 */}
+                  <div className="flex items-start gap-2 mb-2">
+                    <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(doc.id)}
+                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500 flex-shrink-0 cursor-pointer" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-800 leading-snug line-clamp-2">{doc.title}</div>
+                    </div>
+                  </div>
+                  {/* 标签行 */}
+                  <div className="flex items-center gap-2 mb-2 ml-6">
+                    <span className="inline-block px-1.5 py-0.5 text-[10px] font-medium rounded-full"
+                      style={{ backgroundColor: getCategoryColor(doc.category) + "15", color: getCategoryColor(doc.category) }}>
+                      {doc.category}
+                    </span>
+                    {doc.reviewed ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-green-600">
+                        <CheckCircle className="w-3 h-3" /> 已审阅
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-amber-600">
+                        <AlertCircle className="w-3 h-3" /> 未审阅
+                      </span>
+                    )}
+                    <span className="text-[10px] text-gray-400">{fmtTime(doc.updatedAt)}</span>
+                  </div>
+                  {/* 操作按钮 */}
+                  <div className="flex items-center gap-1 ml-6">
+                    <button onClick={() => { const nowFav = toggleFavorite(doc.id); setFavIds(new Set(getFavoriteIds())); }}
+                      className={`p-1.5 rounded-md transition-colors ${favIds.has(doc.id) ? "text-amber-400" : "text-gray-300"}`}
+                      title={favIds.has(doc.id) ? "取消收藏" : "收藏"}>
+                      <Star className="w-3.5 h-3.5" fill={favIds.has(doc.id) ? "currentColor" : "none"} />
+                    </button>
+                    <button onClick={() => handleEdit(doc.id)} className="p-1.5 rounded-md text-gray-400 hover:text-blue-600" title="编辑">
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => setPreviewDoc(doc)} className="p-1.5 rounded-md text-gray-400 hover:text-cyan-600" title="预览">
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => { if (doc.id) setReviewDocId(doc.id); }}
+                      className="p-1.5 rounded-md text-gray-400 hover:text-amber-600" title="提交审阅">
+                      <SendHorizonal className="w-3.5 h-3.5" />
+                    </button>
+                    <ExportMenu title={doc.title} content={doc.content || ""} size="sm" />
+                    {confirmDelete === doc.id ? (
+                      <div className="flex items-center gap-1 ml-auto">
+                        <button onClick={() => performDelete([doc.id])} disabled={deleting}
+                          className="px-2 py-1 text-[10px] bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50">
+                          {deleting ? "..." : "确认"}
+                        </button>
+                        <button onClick={() => setConfirmDelete(null)} className="px-2 py-1 text-[10px] bg-gray-100 text-gray-600 rounded-md hover:bg-gray-200">取消</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => handleDeleteClick(doc.id)} className="p-1.5 rounded-md text-gray-400 hover:text-red-600" title="删除">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          </>
         )}
 
         {/* 底部统计 */}

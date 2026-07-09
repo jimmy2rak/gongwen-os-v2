@@ -221,7 +221,7 @@ export default function HotArticlesPage() {
 
   return (
     <DashboardLayout title="热点推送">
-      <div className="p-6 max-w-5xl mx-auto space-y-4">
+      <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
         {/* 头部 — 统一标题 "热点推送"，无副标题 */}
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-800">热点推送</h2>

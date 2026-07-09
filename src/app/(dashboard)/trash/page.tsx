@@ -250,7 +250,7 @@ export default function TrashPage() {
 
   return (
     <DashboardLayout title="回收站">
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="p-4 md:p-6 max-w-6xl mx-auto">
         {/* Toast */}
         {toast && (
           <div className={`fixed top-4 right-4 z-[100] flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm ${

@@ -7,7 +7,7 @@ export default function QuickDraftLayout({ children }: { children: React.ReactNo
   return (
     <DashboardLayout title="一键初稿">
       <QuickDraftNav />
-      <div className="p-6 max-w-5xl mx-auto w-full">{children}</div>
+      <div className="p-4 md:p-6 max-w-5xl mx-auto w-full">{children}</div>
     </DashboardLayout>
   );
 }
