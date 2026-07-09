@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: { code: "NOT_CONFIGURED", message: "Google OAuth 未配置" } }, { status: 500 });
     }
 
-    const redirectUri = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/auth/callback/google`;
+    const redirectUri = `${req.nextUrl.origin}/auth/callback/google`;
 
     // 1. 用 code 换 access_token
     const tokenRes = await fetch(GOOGLE_TOKEN_URL, {
