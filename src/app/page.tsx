@@ -17,6 +17,7 @@ import { EditorMetaBar } from "@/components/editor/EditorMetaBar";
 import { EditorFooterBar } from "@/components/editor/EditorFooterBar";
 import { getAllCategories, getCategoryColor } from "@/types";
 import { buildDocFromTemplate } from "@/lib/template-to-doc";
+import { markdownToGovDocHtml, looksLikeMarkdown } from "@/lib/markdown";
 import {
   Save, Download, ChevronDown, Plus, Clock, CheckCircle, AlertTriangle,
 } from "lucide-react";
@@ -167,12 +168,18 @@ export default function HomePage() {
     const replaceKey = "gw-pending-replace";
     const append = localStorage.getItem(appendKey);
     const replace = localStorage.getItem(replaceKey);
+    const title = store.title || "未命名公文";
+
+    const convert = (raw: string) =>
+      looksLikeMarkdown(raw) ? markdownToGovDocHtml(raw, title) : raw;
+
     if (append) {
       localStorage.removeItem(appendKey);
       const existing = store.content || "";
-      const newContent = existing + (existing ? "\n\n" : "") + append;
+      const appended = convert(append);
+      const newContent = existing + (existing ? "\n" : "") + appended;
       store.initDoc({
-        title: store.title || "未命名公文",
+        title,
         category: store.category,
         content: newContent,
       });
@@ -180,9 +187,9 @@ export default function HomePage() {
     } else if (replace) {
       localStorage.removeItem(replaceKey);
       store.initDoc({
-        title: store.title || "未命名公文",
+        title,
         category: store.category,
-        content: replace,
+        content: convert(replace),
       });
       showDialog("已替换", "已用一键初稿内容替换全文");
     }

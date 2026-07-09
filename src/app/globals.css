@@ -363,3 +363,31 @@
 .dark .fixed.inset-0.z-\[80\] .text-gray-800 {
   color: var(--card-foreground) !important;
 }
+
+/* ── 一键初稿/大纲生成结果预览 ── */
+.gov-doc-preview h1,
+.gov-doc-preview h2,
+.gov-doc-preview h3,
+.gov-doc-preview h4 {
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+.gov-doc-preview h1 { font-size: 1.15rem; }
+.gov-doc-preview h2 { font-size: 1.05rem; }
+.gov-doc-preview h3 { font-size: 0.95rem; }
+.gov-doc-preview p {
+  margin-bottom: 0.75em;
+  text-align: justify;
+}
+.gov-doc-preview ul,
+.gov-doc-preview ol {
+  padding-left: 1.5em;
+  margin-bottom: 0.75em;
+}
+.gov-doc-preview li {
+  margin-bottom: 0.25em;
+}
+.gov-doc-preview strong {
+  font-weight: 600;
+}

@@ -20,8 +20,9 @@ export function useGenerate() {
    * 执行流式生成。
    * @param userPrompt 用户输入的提示词
    * @param category 公文分类（可选，传入后将自动注入该分类的 DB Skill）
+   * @param extraSystemExtra 额外追加到 system prompt 的上下文文本（如用户勾选的 Skill）
    */
-  const run = async (userPrompt: string, category?: string) => {
+  const run = async (userPrompt: string, category?: string, extraSystemExtra?: string) => {
     if (!model) {
       setError("请先在「系统设置 → API 配置」添加并启用密钥");
       return;
@@ -41,6 +42,7 @@ export function useGenerate() {
         onToken: (t) => setText((prev) => prev + t),
         onError: (m) => setError(m),
         category, // ← 注入分类 Skill
+        extraSystemExtra,
       });
     } catch (e: any) {
       if (e?.name !== "AbortError") setError("生成失败：" + (e?.message || "未知错误"));

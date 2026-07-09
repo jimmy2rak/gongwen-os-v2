@@ -15,6 +15,8 @@ export interface StreamChatOptions {
   useGlobalContext?: boolean;
   /** 公文分类：自动从 DB 获取该分类的 Skill 并注入 systemExtra */
   category?: string;
+  /** 额外追加到 system prompt 的文本（优先级最高，覆盖/追加在分类上下文之后） */
+  extraSystemExtra?: string;
   signal: AbortSignal;
   onToken: (t: string) => void;
   onError: (m: string) => void;
@@ -24,14 +26,19 @@ export async function streamChat(opts: StreamChatOptions): Promise<void> {
   // 构建完整的 systemExtra
   let systemExtra = opts.useGlobalContext === false ? "" : buildGlobalContext();
 
-  // 如果指定了分类，异步获取分类 Skill 并追加
-  if (opts.category) {
+  // 如果指定了分类且未提供额外 Skill 上下文，异步获取分类 Skill 并追加
+  if (opts.category && !opts.extraSystemExtra) {
     try {
       const catCtx = await buildCategoryContext(opts.category);
       if (catCtx) {
         systemExtra = [systemExtra, catCtx].filter(Boolean).join("\n\n");
       }
     } catch { /* 分类 Skill 获取失败不阻断 */ }
+  }
+
+  // 追加用户额外指定的上下文（如手动勾选的 Skill）
+  if (opts.extraSystemExtra) {
+    systemExtra = [systemExtra, opts.extraSystemExtra].filter(Boolean).join("\n\n");
   }
 
   const res = await fetch("/api/ai/chat", {

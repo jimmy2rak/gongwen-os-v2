@@ -7,6 +7,8 @@ import { Wand2, Loader2, X, Settings } from "lucide-react";
 import { getAllCategories } from "@/types";
 import { useGenerate } from "@/lib/ai/use-generate";
 import { GenActions } from "@/components/quick-draft/GenActions";
+import { SkillSelector } from "@/components/quick-draft/SkillSelector";
+import { markdownToGovDocHtml } from "@/lib/markdown";
 
 export default function QuickPage() {
   const allCats = getAllCategories();
@@ -14,6 +16,7 @@ export default function QuickPage() {
   const [title, setTitle] = useState("");
   const [demand, setDemand] = useState("");
   const [words, setWords] = useState(1500);
+  const [skillContext, setSkillContext] = useState("");
 
   const { options, model, setModel, loading, streaming, text, error, run, cancel } = useGenerate();
 
@@ -26,8 +29,9 @@ export default function QuickPage() {
 - 标题建议：${effectiveTitle}
 - 篇幅：约 ${words} 字
 - 需求要点：${demand.trim()}
+输出格式要求：请使用 Markdown 格式输出，主标题用 # 开头，各级小标题依次用 ##、###、#### 开头，正文段落之间空一行，列表用 1. 2. 3. 或 - 表示。
 请直接输出公文正文（含合适的小标题与层级结构），严格遵循《党政机关公文格式》(GB/T 9704-2012) 规范，语言庄重、精练、书面化。`;
-    run(prompt, category);
+    run(prompt, category, skillContext);
   };
 
   return (
@@ -105,6 +109,12 @@ export default function QuickPage() {
             )}
           </div>
 
+          {/* Skill 选择器 */}
+          <SkillSelector
+            category={category}
+            onContextChange={(ctx) => setSkillContext(ctx)}
+          />
+
           <button
             onClick={handleGenerate}
             disabled={!canGenerate}
@@ -126,7 +136,10 @@ export default function QuickPage() {
           <div className="text-xs text-gray-500 mb-2">生成结果</div>
           <div className="border border-gray-200 rounded-xl bg-white p-4 min-h-[320px] max-h-[520px] overflow-auto">
             {text ? (
-              <pre className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed font-sans">{text}</pre>
+              <div
+                className="text-sm text-gray-800 leading-relaxed gov-doc-preview"
+                dangerouslySetInnerHTML={{ __html: markdownToGovDocHtml(text, effectiveTitle) }}
+              />
             ) : (
               <p className="text-xs text-gray-300">生成内容将显示在这里</p>
             )}

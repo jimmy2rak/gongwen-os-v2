@@ -27,6 +27,7 @@ import { DocTitle } from "./extensions/DocTitle";
 import { useEffect, useRef } from "react";
 import type { Editor } from "@tiptap/react";
 import type { DocMetaInfo } from "@/types";
+import { looksLikeMarkdown, markdownToGovDocHtml } from "@/lib/markdown";
 import "./editor.css";
 
 interface DocEditorProps {
@@ -42,21 +43,7 @@ interface DocEditorProps {
 
 /** 将 Markdown 格式的模板文本转换为 HTML */
 function templateMarkdownToHtml(md: string): string {
-  let html = md
-    .replace(/^# (.+)$/gm, (_, t) => `<div data-type="doc-title">${t.trim()}</div>`)
-    .replace(/^## (.+)$/gm, (_, t) => `<h1>${t.trim()}</h1>`)
-    .replace(/^### (.+)$/gm, (_, t) => `<h2>${t.trim()}</h2>`)
-    .replace(/^#### (.+)$/gm, (_, t) => `<h3>${t.trim()}</h3>`)
-    .replace(/\*\*(.+?)\*\*/g, (_, t) => `<strong>${t}</strong>`)
-    .split(/\n\n+/)
-    .map((block) => {
-      const trimmed = block.trim();
-      if (!trimmed) return "";
-      if (/^<h[1-4]>/.test(trimmed) || /^<div/.test(trimmed) || /^<table/.test(trimmed)) return trimmed;
-      return `<p>${trimmed.replace(/\n/g, "<br/>")}</p>`;
-    })
-    .join("\n");
-  return html;
+  return markdownToGovDocHtml(md);
 }
 
 export function DocEditor({
@@ -120,7 +107,7 @@ export function DocEditor({
   useEffect(() => {
     if (editor && content) {
       const currentHtml = editor.getHTML();
-      const isMarkdown = !/<[a-z][\s\S]*>/i.test(content);
+      const isMarkdown = looksLikeMarkdown(content);
       const targetHtml = isMarkdown ? templateMarkdownToHtml(content) : content;
       if (targetHtml && targetHtml !== currentHtml) {
         editor.commands.setContent(targetHtml);

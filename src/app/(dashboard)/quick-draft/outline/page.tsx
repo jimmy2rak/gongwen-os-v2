@@ -7,12 +7,15 @@ import { Wand2, Loader2, X, ListTree, FileText, Settings } from "lucide-react";
 import { getAllCategories } from "@/types";
 import { useGenerate } from "@/lib/ai/use-generate";
 import { GenActions } from "@/components/quick-draft/GenActions";
+import { SkillSelector } from "@/components/quick-draft/SkillSelector";
+import { markdownToGovDocHtml } from "@/lib/markdown";
 
 export default function OutlinePage() {
   const allCats = getAllCategories();
   const [category, setCategory] = useState<string>(allCats[0]);
   const [theme, setTheme] = useState("");
   const [words, setWords] = useState(2000);
+  const [skillContext, setSkillContext] = useState("");
 
   const { options, model, setModel, loading, streaming, text, error, run, cancel } = useGenerate();
 
@@ -26,8 +29,9 @@ export default function OutlinePage() {
 - 列出一级、二级标题结构（使用"一、""（一）"层级）
 - 概括每段核心内容，无需展开成段
 - 总篇幅目标约 ${words} 字
+输出格式要求：请使用 Markdown 格式输出，主标题用 # 开头，各级小标题依次用 ##、###、#### 开头，正文段落之间空一行，列表用 1. 2. 3. 或 - 表示。
 仅输出大纲，简洁清晰。`;
-    run(prompt, category);
+    run(prompt, category, skillContext);
   };
 
   const handleExpand = () => {
@@ -37,8 +41,9 @@ ${text.trim()}
 要求：
 - 严格按大纲层级展开，语言庄重书面，遵循 GB/T 9704-2012 规范
 - 篇幅约 ${words} 字
+输出格式要求：请使用 Markdown 格式输出，主标题用 # 开头，各级小标题依次用 ##、###、#### 开头，正文段落之间空一行，列表用 1. 2. 3. 或 - 表示。
 直接输出公文正文。`;
-    run(prompt, category);
+    run(prompt, category, skillContext);
   };
 
   return (
@@ -104,6 +109,12 @@ ${text.trim()}
             )}
           </div>
 
+          {/* Skill 选择器 */}
+          <SkillSelector
+            category={category}
+            onContextChange={(ctx) => setSkillContext(ctx)}
+          />
+
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleOutline}
@@ -134,7 +145,10 @@ ${text.trim()}
           <div className="text-xs text-gray-500 mb-2">结果</div>
           <div className="border border-gray-200 rounded-xl bg-white p-4 min-h-[320px] max-h-[520px] overflow-auto">
             {text ? (
-              <pre className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed font-sans">{text}</pre>
+              <div
+                className="text-sm text-gray-800 leading-relaxed gov-doc-preview"
+                dangerouslySetInnerHTML={{ __html: markdownToGovDocHtml(text, category) }}
+              />
             ) : (
               <p className="text-xs text-gray-300">大纲 / 正文将显示在这里</p>
             )}

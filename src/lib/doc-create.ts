@@ -10,18 +10,19 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;");
 }
 
+import { markdownToGovDocHtml, looksLikeMarkdown } from "./markdown";
+
 export async function createDocFromText(
   title: string,
   category: string,
   text: string
 ): Promise<{ id: string } | null> {
-  const paragraphs = text
-    .split(/\n{2,}/)
-    .map((p) => p.trim())
-    .filter(Boolean)
-    .map((p) => `<p>${escapeHtml(p)}</p>`)
-    .join("");
-  const content = `<div data-type="doc-title">${escapeHtml(title)}</div>${paragraphs || "<p></p>"}`;
+  const content = looksLikeMarkdown(text)
+    ? markdownToGovDocHtml(text, title)
+    : `<div data-type="doc-title">${escapeHtml(title)}</div>${text
+        .split(/\n{2,}/)
+        .map((p) => `<p>${escapeHtml(p.trim())}</p>`)
+        .join("") || "<p></p>"}`;
 
   const res = await fetch("/api/documents", {
     method: "POST",
