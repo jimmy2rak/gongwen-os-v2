@@ -16,3 +16,4 @@ export {
   crawlerSource,
   hotArticle,
 } from "./crawler";
+export { oauthAccounts } from "./oauth";

@@ -69,25 +69,41 @@ function AuthContent() {
     finally { setLoading(false); }
   };
 
-  // ── 找回密码（占位，待邮件服务配置后实现） ──
+  // ── 找回密码（真实 API 调用） ──
   const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(""); setSuccess("");
     if (!resetEmail.trim()) { setError("请输入邮箱地址"); return; }
-    // 即使未配置邮件服务，也让用户感知功能存在
     setLoading(true);
     try {
-      // 暂时模拟——后续连接邮件服务后改为真实发送
-      // const res = await fetch("/api/auth/forgot-password", { ... });
-      await new Promise((r) => setTimeout(r, 800));
-      setSuccess(`如「${resetEmail}」已注册，重置密码链接将发送到该邮箱。`);
-    } finally { setLoading(false); }
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resetEmail.trim() }),
+      });
+      const body = await res.json();
+      if (!res.ok) { setError(body.error?.message || "发送失败"); return; }
+      setSuccess(body.message || "重置链接已发送到邮箱");
+    } catch { setError("网络错误，请稍后重试"); }
+    finally { setLoading(false); }
   };
 
-  // ── 社交登录占位 ──
-  const handleSocial = (provider: string) => {
-    // 后续阶段实现
-    setError(`${provider} 登录功能正在开发中，敬请期待`);
+  // ── 社交登录（OAuth 授权跳转） ──
+  const handleSocialLogin = (provider: "github" | "google") => {
+    const clientIds: Record<string, string> = {
+      github: process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || "",
+      google: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "",
+    };
+    const authUrls: Record<string, string> = {
+      github: `https://github.com/login/oauth/authorize?client_id=${clientIds.github}&redirect_uri=${encodeURIComponent(window.location.origin)}/auth/callback/github&scope=user:email`,
+      google: `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientIds.google}&redirect_uri=${encodeURIComponent(window.location.origin)}/auth/callback/google&response_type=code&scope=openid%20email%20profile`,
+    };
+    const url = authUrls[provider];
+    if (!url || !clientIds[provider]) {
+      setError(`${provider === "github" ? "GitHub" : "Google"} 登录尚未配置，请在 .env 中设置相关密钥`);
+      return;
+    }
+    window.location.href = url;
   };
 
   const btnClass = "w-full py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white text-sm font-medium rounded-lg transition-colors";
@@ -205,7 +221,7 @@ function AuthContent() {
           {/* ── 社交登录按钮（圆形图标） ── */}
           <div className="flex items-center justify-center gap-4">
             <button
-              onClick={() => handleSocial("GitHub")}
+              onClick={() => handleSocialLogin("github")}
               className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-gray-700 hover:border-gray-300 transition-all"
               title="GitHub 登录"
             >
@@ -215,7 +231,7 @@ function AuthContent() {
               </svg>
             </button>
             <button
-              onClick={() => handleSocial("Google")}
+              onClick={() => handleSocialLogin("google")}
               className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-100 hover:border-gray-300 transition-all"
               title="Google 登录"
             >
