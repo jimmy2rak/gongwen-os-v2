@@ -13,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GongWen-OS - 智能公文写作系统",
+  title: "公文 OS",
   description: "基于 AI 的智能公文写作与管理平台",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
