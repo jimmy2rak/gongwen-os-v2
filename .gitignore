@@ -33,6 +33,9 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# workbuddy development logs (may contain secrets, not committed)
+.workbuddy/memory/
+
 # database
 *.db
 *.db-journal
