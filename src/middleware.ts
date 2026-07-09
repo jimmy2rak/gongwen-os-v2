@@ -19,11 +19,14 @@ function getJWTSecret(): Uint8Array {
 const PUBLIC_PATHS = [
   "/login",
   "/register",
-  "/api/auth",       // 所有认证 API
-  "/api/export",     // 文档导出（ExportMenu 调用时无 Cookie）
-  "/api/public",     // 爬虫入库开放接口（用 X-Crawler-Auth 头鉴权，无 JWT Cookie）
-  "/_next",          // Next.js 内部资源
+  "/reset-password",   // 重置密码页
+  "/auth/callback",    // OAuth 回调页（GitHub/Google 授权后跳回）
+  "/api/auth",         // 所有认证 API
+  "/api/export",       // 文档导出（ExportMenu 调用时无 Cookie）
+  "/api/public",       // 爬虫入库开放接口（用 X-Crawler-Auth 头鉴权，无 JWT Cookie）
+  "/_next",            // Next.js 内部资源
   "/favicon.ico",
+  "/favicon.svg",
 ];
 
 function isPublicPath(pathname: string): boolean {
