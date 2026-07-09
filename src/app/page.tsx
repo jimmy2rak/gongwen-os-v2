@@ -19,7 +19,7 @@ import { getAllCategories, getCategoryColor } from "@/types";
 import { buildDocFromTemplate } from "@/lib/template-to-doc";
 import { markdownToGovDocHtml, looksLikeMarkdown } from "@/lib/markdown";
 import {
-  Save, Download, ChevronDown, Plus, Clock, CheckCircle, AlertTriangle, Sparkles, X,
+  Save, Download, ChevronDown, Plus, Clock, CheckCircle, AlertTriangle,
 } from "lucide-react";
 import type { Editor } from "@tiptap/react";
 import { ReviewDialog } from "@/components/editor/ReviewDialog";
@@ -82,18 +82,6 @@ export default function HomePage() {
     }, 30000);
     return () => clearInterval(interval);
   }, [store.docId, store.title, store.content]);
-
-  // 手机端 AI 面板本地状态（不持久化，避免影响桌面端）
-  const [mobileAiOpen, setMobileAiOpen] = useState(false);
-
-  // ─── 手机端初始化：折叠元信息栏 ──
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const isMobile = window.innerWidth < 768;
-    if (isMobile) {
-      store.setMetaExpanded(false);
-    }
-  }, []); // 仅在页面挂载时执行一次
 
   // ─── 从 URL 加载文档（URL 格式：/documents/[id]） ──
   useEffect(() => {
@@ -570,7 +558,7 @@ export default function HomePage() {
           {/* 编辑区（纸面） */}
           <div className="flex-1 overflow-auto bg-gray-100">
             <div className="flex items-start justify-center py-4">
-              <div className="w-full max-w-full md:max-w-[210mm]">
+              <div className="w-full max-w-[210mm]">
                 <DocEditor
                   content={store.content}
                   onChange={store.setContent}
@@ -595,38 +583,8 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* 手机端 AI 面板切换按钮（右下角浮动） */}
-        <button
-          onClick={() => setMobileAiOpen(!mobileAiOpen)}
-          className="fixed bottom-20 right-4 z-50 w-12 h-12 rounded-full bg-[#163f3a] text-white shadow-lg flex items-center justify-center md:hidden"
-          title={mobileAiOpen ? "关闭 AI 助手" : "打开 AI 助手"}
-        >
-          {mobileAiOpen ? <X className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
-        </button>
-
-        {/* AI 公文助手侧栏 — 桌面端 inline，手机端全屏覆盖 */}
-        <div className="hidden md:flex">
-          <AiAssistant editor={editorInstance} />
-        </div>
-
-        {/* 手机端 AI 面板覆盖层 */}
-        {mobileAiOpen && (
-          <div className="fixed inset-0 z-40 md:hidden">
-            <div
-              className="fixed inset-0 bg-black/30"
-              onClick={() => setMobileAiOpen(false)}
-            />
-            <div className="fixed inset-y-0 right-0 left-12 z-50 bg-white shadow-2xl flex flex-col">
-              <AiAssistant editor={editorInstance} />
-            </div>
-            <button
-              onClick={() => setMobileAiOpen(false)}
-              className="fixed top-3 left-3 z-[60] w-10 h-10 rounded-full bg-white/90 shadow-md flex items-center justify-center text-gray-600 md:hidden"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        )}
+        {/* AI 公文助手侧栏 */}
+        <AiAssistant editor={editorInstance} />
       </div>
 
       {/* 审阅对话框 */}
