@@ -89,7 +89,7 @@ export function Topbar({
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <button
           onClick={onToggleSidebar}
-          className="p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/60 flex-shrink-0"
+          className="touch-target p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/60 flex-shrink-0"
         >
           <Menu className="w-5 h-5" />
         </button>
@@ -107,7 +107,7 @@ export function Topbar({
         <div className="relative" ref={themeMenuRef}>
           <button
             onClick={() => setShowThemeMenu(!showThemeMenu)}
-            className="p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors"
+            className="touch-target p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors"
             title={
               themeMode === "light" ? "明亮模式" :
               themeMode === "dark" ? "黑暗模式" : "跟随系统"
@@ -120,7 +120,7 @@ export function Topbar({
             <div className="absolute right-0 top-full mt-1 w-36 bg-popover border border-sidebar-border rounded-lg shadow-lg py-1 z-50">
               <button
                 onClick={() => changeTheme("light")}
-                className={`flex items-center gap-2 w-full px-3 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent ${
+                className={`flex items-center gap-2 w-full px-3 py-2 min-h-[44px] text-sm text-sidebar-foreground hover:bg-sidebar-accent ${
                   themeMode === "light" ? "font-medium" : ""
                 }`}
               >
@@ -128,7 +128,7 @@ export function Topbar({
               </button>
               <button
                 onClick={() => changeTheme("dark")}
-                className={`flex items-center gap-2 w-full px-3 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent ${
+                className={`flex items-center gap-2 w-full px-3 py-2 min-h-[44px] text-sm text-sidebar-foreground hover:bg-sidebar-accent ${
                   themeMode === "dark" ? "font-medium" : ""
                 }`}
               >
@@ -136,7 +136,7 @@ export function Topbar({
               </button>
               <button
                 onClick={() => changeTheme("auto")}
-                className={`flex items-center gap-2 w-full px-3 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent ${
+                className={`flex items-center gap-2 w-full px-3 py-2 min-h-[44px] text-sm text-sidebar-foreground hover:bg-sidebar-accent ${
                   themeMode === "auto" ? "font-medium" : ""
                 }`}
               >
@@ -148,7 +148,7 @@ export function Topbar({
 
         {/* 首页图标 */}
         <a href="/home"
-          className="p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors"
+          className="touch-target p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors"
           title="首页">
           <Home className="w-4 h-4" />
         </a>
@@ -156,7 +156,7 @@ export function Topbar({
           <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-sidebar-accent text-sm text-sidebar-foreground/80 ml-1"
+              className="touch-target flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-sidebar-accent text-sm text-sidebar-foreground/80 ml-1"
             >
               <User className="w-4 h-4" />
               <span>{user.name || user.email}</span>
@@ -167,7 +167,7 @@ export function Topbar({
               <div className="absolute right-0 top-full mt-1 w-40 bg-popover border border-sidebar-border rounded-lg shadow-lg py-1 z-50">
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent"
+                  className="flex items-center gap-2 w-full px-3 py-2 min-h-[44px] text-sm text-sidebar-foreground hover:bg-sidebar-accent"
                 >
                   <LogOut className="w-4 h-4" />
                   退出登录

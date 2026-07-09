@@ -632,33 +632,33 @@ export default function DocumentsPage() {
                     <span className="text-[10px] text-gray-400">{fmtTime(doc.updatedAt)}</span>
                   </div>
                   {/* 操作按钮 */}
-                  <div className="flex items-center gap-1 ml-6">
+                  <div className="flex items-center gap-1 ml-6 flex-wrap">
                     <button onClick={() => { const nowFav = toggleFavorite(doc.id); setFavIds(new Set(getFavoriteIds())); }}
-                      className={`p-1.5 rounded-md transition-colors ${favIds.has(doc.id) ? "text-amber-400" : "text-gray-300"}`}
+                      className={`touch-target p-1.5 rounded-md transition-colors ${favIds.has(doc.id) ? "text-amber-400" : "text-gray-300"}`}
                       title={favIds.has(doc.id) ? "取消收藏" : "收藏"}>
                       <Star className="w-3.5 h-3.5" fill={favIds.has(doc.id) ? "currentColor" : "none"} />
                     </button>
-                    <button onClick={() => handleEdit(doc.id)} className="p-1.5 rounded-md text-gray-400 hover:text-blue-600" title="编辑">
+                    <button onClick={() => handleEdit(doc.id)} className="touch-target p-1.5 rounded-md text-gray-400 hover:text-blue-600" title="编辑">
                       <Edit3 className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => setPreviewDoc(doc)} className="p-1.5 rounded-md text-gray-400 hover:text-cyan-600" title="预览">
+                    <button onClick={() => setPreviewDoc(doc)} className="touch-target p-1.5 rounded-md text-gray-400 hover:text-cyan-600" title="预览">
                       <Eye className="w-3.5 h-3.5" />
                     </button>
                     <button onClick={() => { if (doc.id) setReviewDocId(doc.id); }}
-                      className="p-1.5 rounded-md text-gray-400 hover:text-amber-600" title="提交审阅">
+                      className="touch-target p-1.5 rounded-md text-gray-400 hover:text-amber-600" title="提交审阅">
                       <SendHorizonal className="w-3.5 h-3.5" />
                     </button>
                     <ExportMenu title={doc.title} content={doc.content || ""} size="sm" />
                     {confirmDelete === doc.id ? (
                       <div className="flex items-center gap-1 ml-auto">
                         <button onClick={() => performDelete([doc.id])} disabled={deleting}
-                          className="px-2 py-1 text-[10px] bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50">
+                          className="touch-target px-3 py-2 text-[10px] bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50">
                           {deleting ? "..." : "确认"}
                         </button>
-                        <button onClick={() => setConfirmDelete(null)} className="px-2 py-1 text-[10px] bg-gray-100 text-gray-600 rounded-md hover:bg-gray-200">取消</button>
+                        <button onClick={() => setConfirmDelete(null)} className="touch-target px-3 py-2 text-[10px] bg-gray-100 text-gray-600 rounded-md hover:bg-gray-200">取消</button>
                       </div>
                     ) : (
-                      <button onClick={() => handleDeleteClick(doc.id)} className="p-1.5 rounded-md text-gray-400 hover:text-red-600" title="删除">
+                      <button onClick={() => handleDeleteClick(doc.id)} className="touch-target p-1.5 rounded-md text-gray-400 hover:text-red-600" title="删除">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}

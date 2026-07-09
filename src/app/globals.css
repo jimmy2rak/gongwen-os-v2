@@ -391,3 +391,65 @@
 .gov-doc-preview strong {
   font-weight: 600;
 }
+
+/* ── 手机端触控优化 ── */
+@media (max-width: 767px) {
+  /* 确保可点击元素最小触摸区域 44x44px（Apple HIG / Material Design 规范） */
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* 导航链接触摸区域 */
+  nav a,
+  aside a {
+    min-height: 44px;
+  }
+
+  /* 表格/列表中的图标按钮 */
+  table button,
+  .table-actions button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* 下拉菜单项 */
+  [role="menuitem"],
+  .dropdown-item {
+    min-height: 44px;
+  }
+
+  /* 筛选 pill 按钮 */
+  .filter-pill-btn {
+    min-height: 44px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  /* Tab 按钮 */
+  .tab-btn {
+    min-height: 44px;
+  }
+
+  /* 表单控件 */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important; /* iOS 防缩放 */
+  }
+
+  /* 弹窗按钮 */
+  .modal-btn {
+    min-height: 44px;
+  }
+
+  /* 文本类按钮恢复自动高度 */
+  button.text-xs:not(.touch-target):not(.table-actions button),
+  button.text-[10px]:not(.touch-target) {
+    min-height: auto;
+    min-width: auto;
+  }
+}
