@@ -97,8 +97,8 @@
 |------|------|------|
 | T2 侧边栏/顶栏显示默认画像状态 | ⏳ 待做 | TODO 原规划，工作量小 |
 | 设置页"菜单可见性"tab | ⏳ 待做 | 设置为 ready: false |
-| 🔴 **GitHub/Google OAuth 登录** | 🚫 **暂停** | Brevo SMTP Key 认证失败（535 Authentication failed），导致邮件发送不可用；OAuth 回调流程缺少完整部署环境验证。等待 Brevo SMTP Key 问题解决后再恢复 |
-| 🔴 **Brevo 邮件发送** | 🐛 **修复中** | SMTP Key（xsmtpsib-...）认证失败，需在 Brevo 后台重新创建 SMTP Key，并验证发件人邮箱 `noreply@gongwenos.182183.xyz` 或改用已验证的个人邮箱 |
+| 🔴 **GitHub/Google OAuth 登录** | 🚫 **暂停** | Brevo SMTP 被废弃改为 REST API；OAuth 已删除，如需要后续重新接入。目前验证码/Magic Link 已替代 |
+| ✅ **Brevo 邮件发送** | ✅ **已修复** | SMTP 认证失败（535），改为 Brevo v3 Transactional Email REST API，API Key 可用 |
 
 ---
 

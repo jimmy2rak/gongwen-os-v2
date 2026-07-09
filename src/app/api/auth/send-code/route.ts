@@ -7,7 +7,7 @@ import { db } from "@/server/db";
 import { verificationTokens } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { sendEmail } from "@/server/email/send";
+import { sendLoginCodeEmail } from "@/server/email/send";
 
 export async function POST(req: NextRequest) {
   try {
@@ -54,30 +54,7 @@ export async function POST(req: NextRequest) {
 
     // 发送邮件（验证码 + Magic Link）
     const magicUrl = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/auth/magic-link?token=${magicToken}`;
-    await sendEmail(
-      email,
-      "【公文 OS】登录验证码",
-      `<div style="max-width:480px;margin:0 auto;font-family:sans-serif;padding:24px;">
-        <h2 style="font-size:18px;margin-bottom:16px;">登录验证码</h2>
-        <p style="font-size:14px;line-height:1.6;color:#333;">您好，</p>
-        <p style="font-size:14px;line-height:1.6;color:#333;">您的登录验证码为：</p>
-        <div style="text-align:center;margin:24px 0;">
-          <span style="font-size:36px;font-weight:bold;letter-spacing:8px;color:#163f3a;">${code}</span>
-        </div>
-        <p style="font-size:14px;line-height:1.6;color:#333;">验证码 10 分钟内有效。</p>
-        <hr style="border:none;border-top:1px solid #eee;margin:24px 0;" />
-        <p style="font-size:13px;color:#666;">或点击下方链接直接登录（无需输入密码）：</p>
-        <a href="${magicUrl}"
-           style="display:inline-block;margin:8px 0;padding:10px 24px;background:#163f3a;color:#fff;
-                  text-decoration:none;border-radius:8px;font-size:13px;">
-          一键登录
-        </a>
-        <p style="font-size:12px;color:#999;margin-top:20px;">
-          如非本人操作，请忽略此邮件。
-        </p>
-        <p style="font-size:12px;color:#999;">— 公文 OS 团队</p>
-      </div>`,
-    );
+    await sendLoginCodeEmail(email, code, magicUrl);
 
     return NextResponse.json({ success: true, message: "验证码已发送到邮箱" });
   } catch (err) {
