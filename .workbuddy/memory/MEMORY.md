@@ -55,3 +55,21 @@
 ### 黑暗模式 CSS 策略
 - 全局覆盖在 `globals.css` 的 `.dark` 块中，用 `!important` 覆盖硬编码 Tailwind 类
 - 模板管理、预览弹窗的专用覆盖放在 `globals.css` 末尾
+
+### Markdown 转公文 HTML（2026-07-09 新增）
+- 工具路径：`src/lib/markdown.ts`
+- 使用 `marked` 库解析 Markdown，首个标题映射为 `<div data-type="doc-title">`
+- `looksLikeMarkdown()`：检测文本是否含 Markdown 特征
+- `markdownToGovDocHtml(md, title?)`：转 TipTap 可识别 HTML
+- 适用场景：一键初稿、大纲生成、编辑器初始化、保存为文档
+
+### Skill 选择器组件（2026-07-09 新增）
+- 路径：`src/components/quick-draft/SkillSelector.tsx`
+- 复用 AI chatbox 树状选择逻辑：全局 Skill + DB 分类 Skill，可多选/全选/折叠
+- 通过 `onContextChange` 返回可直接注入 AI system prompt 的上下文文本
+- 已用于：一键初稿「出稿」页、「大纲」页
+
+### AI 生成上下文注入（2026-07-09 新增）
+- `useGenerate().run(prompt, category, extraSystemExtra)` 支持追加自定义 Skill 上下文
+- `streamChat` 的 `extraSystemExtra` 会追加到 system prompt；提供时跳过自动全量分类 Skill，避免与用户选择重复
+- Prompt 中明确指定 Markdown 输出格式，配合 `markdownToGovDocHtml` 实现端到端可编辑渲染
