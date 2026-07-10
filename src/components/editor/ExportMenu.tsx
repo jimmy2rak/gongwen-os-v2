@@ -89,11 +89,11 @@ export function ExportMenu({ title, content, className = "", size = "md", onResu
           <html><head><meta charset="utf-8"><title>${title}</title>
           <style>
             @page { size: A4; margin: 3.4cm 2.5cm 3.5cm 2.6cm; }
-            body { font-family:'仿宋_GB2312','仿宋','FangSong',serif;font-size:16pt;line-height:28pt; }
-            .doc-title { font-family:'方正小标宋简体',serif;font-size:22pt;text-align:center;font-weight:bold; }
-            h1 { font-family:'黑体',serif;font-size:16pt;font-weight:bold; }
-            h2 { font-family:'楷体',serif;font-size:16pt; }
-            h3 { font-family:'仿宋_GB2312','仿宋','FangSong',serif;font-size:16pt; }
+            body { font-family:'Times New Roman','仿宋_GB2312','仿宋','FangSong',serif;font-size:16pt;line-height:28pt; }
+            .doc-title { font-family:'Times New Roman','方正小标宋简体',serif;font-size:22pt;text-align:center;font-weight:bold; }
+            h1 { font-family:'Times New Roman','黑体',serif;font-size:16pt; }
+            h2 { font-family:'Times New Roman','楷体_GB2312','楷体','KaiTi',serif;font-size:16pt; }
+            h3 { font-family:'Times New Roman','仿宋_GB2312','仿宋','FangSong',serif;font-size:16pt; }
             p { text-indent:2em;margin:0; }
             .review-section { margin-top:20px; padding-top:10px; border-top:1px solid #ccc; font-size:12pt; color:#666; }
           </style></head><body>${content}${reviewSuffix ? `<div class="review-section">${reviewSuffix.replace(/\n/g, "<br>")}</div>` : ""}</body></html>

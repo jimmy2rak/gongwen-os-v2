@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { KeyRound, User, Eye, Settings as SettingsIcon, Sparkles, UserCheck, Globe, Terminal } from "lucide-react";
+import { KeyRound, User, Eye, Settings as SettingsIcon, Sparkles, UserCheck, Globe, Terminal, Shield } from "lucide-react";
 import ApiConfigPanel from "@/components/settings/ApiConfigPanel";
 import ProfilePanel from "@/components/settings/ProfilePanel";
 import GlobalSkillPanel from "@/components/settings/GlobalSkillPanel";
 import ReviewerPanel from "@/components/settings/ReviewerPanel";
 import CrawlerAdminPanel from "@/components/settings/CrawlerAdminPanel";
+import UserAdminPanel from "@/components/settings/UserAdminPanel";
 
 interface SettingsMenu {
   id: string;
@@ -24,6 +25,7 @@ const SETTINGS_MENUS: SettingsMenu[] = [
   { id: "profile", label: "用户画像", desc: "配置发文身份（全局 AI 调用）", icon: User, ready: true },
   { id: "skill", label: "全局Skill", desc: "全局写作规范（与 DocSkill 并存）", icon: Sparkles, ready: true },
   { id: "reviewer", label: "审阅人管理", desc: "配置公文审阅人名单", icon: UserCheck, ready: true },
+  { id: "users", label: "用户权限管理", desc: "分配管理员权限并管理权限开关", icon: Shield, ready: true, requiredSuper: true },
   { id: "crawler", label: "爬虫热点推送配置", desc: "超管专属：数据源与一键爬虫脚本", icon: Terminal, ready: true, requiredSuper: true },
   { id: "menu", label: "菜单可见性", desc: "自定义菜单显示", icon: Eye, ready: false },
 ];
@@ -95,6 +97,7 @@ export default function SettingsPage() {
             {active === "skill" && <GlobalSkillPanel />}
             {active === "reviewer" && <ReviewerPanel />}
             {active === "crawler" && <CrawlerAdminPanel />}
+            {active === "users" && <UserAdminPanel />}
 
             {!current.ready && (
               <div className="text-center py-20 bg-gray-50 rounded-xl border border-dashed border-gray-200">

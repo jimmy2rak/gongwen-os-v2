@@ -11,6 +11,7 @@ import { getServerUser } from "@/server/auth/guard";
 import { isSuperAdmin } from "@/server/auth/super-admin";
 import { getCrawlerUploadKey } from "@/server/auth/secret";
 import { renderCrawlerScript } from "@/lib/crawler-template";
+import { renderXinhuaCrawlerScript } from "@/lib/crawler-xinhua-template";
 
 export async function POST(req: NextRequest) {
   const user = await getServerUser();
@@ -20,7 +21,52 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { sourceId } = await req.json();
+    const body = await req.json();
+    const { sourceId, templateType } = body;
+
+    // 自定义生成模式：不依赖数据库，根据 templateType 直接渲染
+    if (templateType && !sourceId) {
+      const apiKey = await getCrawlerUploadKey();
+      if (!apiKey) {
+        return NextResponse.json(
+          { success: false, error: { message: "尚未配置爬虫入库密钥" } },
+          { status: 500 }
+        );
+      }
+      const backendUrl = new URL("/api/public/crawler/upload", req.nextUrl.origin).toString();
+      if (templateType === "xinhua") {
+        const { siteName, indexUrl, defaultCategory } = body;
+        const code = renderXinhuaCrawlerScript({
+          apiKey,
+          backendUrl,
+          sourceId: "custom",
+          columnId: "",
+          siteName: siteName || "新华网",
+          indexUrl: indexUrl || "https://www.news.cn/politics/xhll/index.html",
+          defaultCategory: defaultCategory || "理论动态",
+        });
+        return new NextResponse(code, {
+          status: 200,
+          headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+        });
+      }
+      // 默认人民日报模板（自定义参数）
+      const { siteName, baseUrl, defaultCategory } = body;
+      const code = renderCrawlerScript({
+        apiKey,
+        backendUrl,
+        sourceId: "custom",
+        columnId: "",
+        baseUrl: baseUrl || "http://paper.people.com.cn/rmrb/pc/layout",
+        siteName: siteName || "人民日报",
+        defaultCategory: defaultCategory || "时政",
+      });
+      return new NextResponse(code, {
+        status: 200,
+        headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+      });
+    }
+
     if (!sourceId) {
       return NextResponse.json({ success: false, error: { message: "缺少 sourceId" } }, { status: 400 });
     }
@@ -44,18 +90,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 后端推导入库接口地址（与超管访问同源，前端不接触该值）
     const backendUrl = new URL("/api/public/crawler/upload", req.nextUrl.origin).toString();
 
-    const code = renderCrawlerScript({
-      apiKey,
-      backendUrl,
-      sourceId: row.id,
-      columnId: row.target_column_id || "",
-      baseUrl: row.base_url,
-      siteName: row.source_name,
-      defaultCategory: row.category_tag || "综合",
-    });
+    // 新华网使用单页理论动态模板
+    const isXinhua = row.source_name === "新华网" || /news\.cn\/politics\/xhll/.test(row.base_url || "");
+
+    let code: string;
+    if (isXinhua) {
+      code = renderXinhuaCrawlerScript({
+        apiKey,
+        backendUrl,
+        sourceId: row.id,
+        columnId: row.target_column_id || "",
+        siteName: row.source_name,
+        indexUrl: row.base_url,
+        defaultCategory: row.category_tag || "理论动态",
+      });
+    } else {
+      code = renderCrawlerScript({
+        apiKey,
+        backendUrl,
+        sourceId: row.id,
+        columnId: row.target_column_id || "",
+        baseUrl: row.base_url,
+        siteName: row.source_name,
+        defaultCategory: row.category_tag || "综合",
+      });
+    }
 
     return new NextResponse(code, {
       status: 200,

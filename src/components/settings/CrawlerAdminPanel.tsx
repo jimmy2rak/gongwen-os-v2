@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import {
   Plus, Trash2, Pencil, X, Check, Globe, Copy, Download, Code2, Terminal,
-  BookTemplate,
+  BookTemplate, Wand2,
 } from "lucide-react";
 import { CustomDialog } from "@/components/ui/CustomDialog";
 import { getAllCategories } from "@/types";
@@ -20,6 +20,7 @@ interface BuiltinPreset {
   baseUrl: string;
   categoryTag: string;
   description: string;
+  template: "rmrb" | "xinhua";
 }
 
 const BUILTIN_PRESETS: BuiltinPreset[] = [
@@ -28,24 +29,28 @@ const BUILTIN_PRESETS: BuiltinPreset[] = [
     baseUrl: "http://paper.people.com.cn/rmrb/pc/layout",
     categoryTag: "时政",
     description: "人民日报电子版 · 理论版/评论版定向抓取",
+    template: "rmrb",
   },
   {
     sourceName: "新华网",
-    baseUrl: "http://www.xinhuanet.com/politics/",
-    categoryTag: "时政",
-    description: "新华网时政频道",
+    baseUrl: "https://www.news.cn/politics/xhll/index.html",
+    categoryTag: "理论动态",
+    description: "新华网 · 理论动态单页定向抓取",
+    template: "xinhua",
   },
   {
     sourceName: "中国政府网",
     baseUrl: "https://www.gov.cn/",
     categoryTag: "政务",
     description: "中央人民政府门户网站",
+    template: "rmrb",
   },
   {
     sourceName: "求是网",
     baseUrl: "http://www.qstheory.cn/",
     categoryTag: "党建",
     description: "求是杂志社官网 · 理论文章",
+    template: "rmrb",
   },
 ];
 
@@ -82,6 +87,15 @@ export default function CrawlerAdminPanel() {
   const [genLoading, setGenLoading] = useState(false);
   const [genCopyOk, setGenCopyOk] = useState(false);
 
+  // 自定义脚本生成器
+  const [showCustomGen, setShowCustomGen] = useState(false);
+  const [customGen, setCustomGen] = useState({
+    template: "rmrb" as "rmrb" | "xinhua",
+    siteName: "",
+    baseUrl: "",
+    defaultCategory: "",
+  });
+
   const allCats = getAllCategories();
 
   // ── 内置模板载入 ──
@@ -99,6 +113,45 @@ export default function CrawlerAdminPanel() {
 
   // 检查某数据源是否已存在
   const isSourceAlreadyAdded = (name: string) => list.some((s) => s.sourceName === name);
+
+  // ── 自定义脚本生成 ──
+  const openCustomGenerate = () => {
+    setCustomGen({ template: "rmrb", siteName: "", baseUrl: "", defaultCategory: "" });
+    setGenCode("");
+    setShowCustomGen(true);
+  };
+
+  const generateCustomScript = async () => {
+    setGenLoading(true);
+    setGenCode("");
+    try {
+      const body: any = {
+        templateType: customGen.template,
+        siteName: customGen.siteName,
+        defaultCategory: customGen.defaultCategory,
+      };
+      if (customGen.template === "xinhua") {
+        body.indexUrl = customGen.baseUrl;
+      } else {
+        body.baseUrl = customGen.baseUrl;
+      }
+      const res = await fetch("/api/admin/crawler/generate-script", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setGenCode(`# 生成失败：${err?.error?.message || res.status}`);
+      } else {
+        setGenCode(await res.text());
+      }
+    } catch {
+      setGenCode("# 网络错误，生成失败");
+    } finally {
+      setGenLoading(false);
+    }
+  };
 
   // ── 拉取数据源（超管接口，普通用户会被 403 拒绝）──
   const loadData = () => {
@@ -204,10 +257,16 @@ export default function CrawlerAdminPanel() {
           <h3 className="text-sm font-medium text-gray-800">爬虫热点推送配置</h3>
           <p className="text-xs text-gray-400 mt-0.5">仅超级管理员可见 · 一键生成可运行 Python 爬虫并自动入库</p>
         </div>
-        <button onClick={openNew}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700">
-          <Plus className="w-3.5 h-3.5" /> 新增数据源
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={openCustomGenerate}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">
+            <Wand2 className="w-3.5 h-3.5" /> 自定义生成脚本
+          </button>
+          <button onClick={openNew}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700">
+            <Plus className="w-3.5 h-3.5" /> 新增数据源
+          </button>
+        </div>
       </div>
 
       {/* ── 内置模板快速载入 ── */}
@@ -280,12 +339,10 @@ export default function CrawlerAdminPanel() {
                     className="p-1.5 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50" title="编辑">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
-                  {!isBuiltin && (
                   <button onClick={() => setConfirmDel(s)}
                     className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50" title="删除">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
-                  )}
                 </div>
               </div>
             </div>
@@ -338,6 +395,106 @@ export default function CrawlerAdminPanel() {
               className="px-4 py-1.5 text-xs text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">取消</button>
             <button onClick={submit} disabled={!form.sourceName.trim() || !form.baseUrl.trim()}
               className="px-4 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300">保存</button>
+          </div>
+        </div>
+      )}
+
+      {/* 自定义脚本生成器弹窗 */}
+      {showCustomGen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowCustomGen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[92vw] max-w-3xl h-[82vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <Wand2 className="w-4 h-4 text-[#163f3a]" />
+                <h2 className="text-sm font-medium text-gray-800">自定义爬虫脚本生成器</h2>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button onClick={copyCode} disabled={!genCode || genLoading}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50">
+                  {genCopyOk ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {genCopyOk ? "已复制" : "复制全部代码"}
+                </button>
+                <button onClick={() => {
+                  if (!genCode) return;
+                  const blob = new Blob([genCode], { type: "text/plain;charset=utf-8" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `crawler_task_${customGen.siteName || "custom"}.py`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }} disabled={!genCode || genLoading}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-[#163f3a] text-white rounded-lg hover:bg-[#163f3a]/80 disabled:opacity-50">
+                  <Download className="w-3 h-3" /> 下载 .py
+                </button>
+                <button onClick={() => setShowCustomGen(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto flex flex-col">
+              <div className="p-5 border-b border-gray-200 bg-gray-50 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label className="block">
+                    <span className="text-xs text-gray-500">模板类型 *</span>
+                    <select
+                      value={customGen.template}
+                      onChange={(e) => setCustomGen({ ...customGen, template: e.target.value as any })}
+                      className={inputCls}>
+                      <option value="rmrb">人民日报电子报模板（日期分页）</option>
+                      <option value="xinhua">新华网单页模板（固定入口）</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs text-gray-500">站点名称 *</span>
+                    <input
+                      value={customGen.siteName}
+                      onChange={(e) => setCustomGen({ ...customGen, siteName: e.target.value })}
+                      placeholder={customGen.template === "xinhua" ? "新华网" : "人民日报"}
+                      className={inputCls} />
+                  </label>
+                  <label className="block sm:col-span-2">
+                    <span className="text-xs text-gray-500">
+                      {customGen.template === "xinhua" ? "入口 URL（单页列表）*" : "抓取根地址 *"}
+                    </span>
+                    <input
+                      value={customGen.baseUrl}
+                      onChange={(e) => setCustomGen({ ...customGen, baseUrl: e.target.value })}
+                      placeholder={customGen.template === "xinhua" ? "https://www.news.cn/politics/xhll/index.html" : "http://paper.people.com.cn/rmrb/pc/layout"}
+                      className={inputCls} />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs text-gray-500">默认分类</span>
+                    <input
+                      value={customGen.defaultCategory}
+                      onChange={(e) => setCustomGen({ ...customGen, defaultCategory: e.target.value })}
+                      placeholder={customGen.template === "xinhua" ? "理论动态" : "时政"}
+                      className={inputCls} />
+                  </label>
+                </div>
+                <div className="flex justify-end">
+                  <button onClick={generateCustomScript}
+                    disabled={!customGen.siteName.trim() || !customGen.baseUrl.trim() || genLoading}
+                    className="flex items-center gap-1 px-4 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300">
+                    {genLoading ? <Check className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                    {genLoading ? "生成中…" : "生成脚本"}
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-auto bg-[#1e1e1e] p-4">
+                {genLoading ? (
+                  <p className="text-gray-400 text-xs">正在生成脚本…</p>
+                ) : genCode ? (
+                  <pre className="text-[11px] leading-relaxed text-gray-100 whitespace-pre"><code>{genCode}</code></pre>
+                ) : (
+                  <p className="text-gray-500 text-xs">填写上方信息并点击「生成脚本」</p>
+                )}
+              </div>
+            </div>
+            <div className="px-5 py-2.5 border-t border-gray-200 text-[11px] text-gray-400 flex-shrink-0">
+              自定义脚本仅供测试与参考，建议保存为数据源后再生成正式脚本，以便后端自动注入密钥与入库地址。
+            </div>
           </div>
         </div>
       )}

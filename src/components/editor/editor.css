@@ -137,7 +137,6 @@
 .doc-mode-official .document-editor .ProseMirror h1 {
   font-family: "Times New Roman", "黑体", "SimHei", var(--font-noto-sans-sc), sans-serif;
   font-size: 16pt;
-  font-weight: bold;
   line-height: 28pt;
   margin: 0.5em 0 0.25em 0;
   text-indent: 2em;

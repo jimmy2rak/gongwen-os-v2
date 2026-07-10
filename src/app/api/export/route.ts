@@ -21,6 +21,48 @@ import {
 /** 磅 → twip：1 磅 = 1/72 英寸 = 20 twip */
 const ptToTwip = (pt: number) => Math.round(pt * 20);
 
+/** 判断字符是否为英文字母或数字（需使用 Times New Roman） */
+function isAsciiLetterOrDigit(char: string): boolean {
+  const code = char.charCodeAt(0);
+  return (code >= 0x30 && code <= 0x39) || // 0-9
+         (code >= 0x41 && code <= 0x5A) || // A-Z
+         (code >= 0x61 && code <= 0x7A);   // a-z
+}
+
+/** 将文本按字体脚本拆分为中文/英文数字段 */
+function splitByScript(text: string): { text: string; font: "latin" | "cjk" }[] {
+  const segments: { text: string; font: "latin" | "cjk" }[] = [];
+  let current = "";
+  let currentFont: "latin" | "cjk" | null = null;
+  for (const ch of text) {
+    const font = isAsciiLetterOrDigit(ch) ? "latin" : "cjk";
+    if (currentFont === null) {
+      currentFont = font;
+      current = ch;
+    } else if (currentFont === font) {
+      current += ch;
+    } else {
+      segments.push({ text: current, font: currentFont });
+      currentFont = font;
+      current = ch;
+    }
+  }
+  if (current && currentFont) segments.push({ text: current, font: currentFont });
+  return segments;
+}
+
+/** 生成带脚本字体拆分的 TextRun 数组 */
+function makeScriptRuns(text: string, baseFont: string, opts: { bold?: boolean; size?: number; shading?: any } = {}): TextRun[] {
+  const size = opts.size ?? 32;
+  return splitByScript(text).map((s) => new TextRun({
+    text: s.text,
+    font: s.font === "latin" ? "Times New Roman" : baseFont,
+    size,
+    bold: opts.bold,
+    shading: opts.shading,
+  }));
+}
+
 /** 统一固定行距：除红头外所有元素（主标题 h1、各级标题、正文）均为 28pt，段前段后 0 */
 const bodyLineSpacing = {
   lineRule: LineRuleType.EXACT,
@@ -46,8 +88,8 @@ const listLeftIndent = { left: ptToTwip(32) }; // 2em@16pt = 32pt = 640twip
 /** 引用块左缩进 3em（编辑器 margin-left:2em + padding-left:1em @16pt = 48pt = 960twip） */
 const quoteLeftIndent = { left: ptToTwip(48) };
 
-/** 从行内 HTML 片段提取 TextRun 列表（解析 <mark>、<span> 高亮背景色） */
-function parseInlineToTextRuns(html: string): TextRun[] {
+/** 从行内 HTML 片段提取 TextRun 列表（解析 <mark>、<span> 高亮背景色），按脚本拆分字体 */
+function parseInlineToTextRuns(html: string, baseFont: string = "仿宋_GB2312", bold = false): TextRun[] {
   const runs: TextRun[] = [];
 
   // 预处理：将 <br> 转为换行符，方便后续分段
@@ -73,6 +115,7 @@ function parseInlineToTextRuns(html: string): TextRun[] {
       }
 
       let hexColor = "";
+      let shading: any = undefined;
       if (bgColor) {
         const rgbMatch = bgColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
         if (rgbMatch) {
@@ -80,16 +123,13 @@ function parseInlineToTextRuns(html: string): TextRun[] {
         } else if (bgColor.startsWith("#")) {
           hexColor = bgColor;
         }
+        if (hexColor) shading = { type: "clear", fill: hexColor.replace("#", "") };
       }
 
       const cleanText = spanText.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&")
         .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
 
-      const runOpts: any = { text: cleanText, font: "仿宋_GB2312", size: 32 };
-      if (hexColor) {
-        runOpts.shading = { type: "clear", fill: hexColor.replace("#", "") };
-      }
-      runs.push(new TextRun(runOpts));
+      runs.push(...makeScriptRuns(cleanText, baseFont, { bold, shading }));
     } else if (match[3] !== undefined) {
       // 纯文本（可能夹杂 <strong>、<br> 等其他标签，剥离标签提取纯文本）
       const txt = match[3]
@@ -101,7 +141,7 @@ function parseInlineToTextRuns(html: string): TextRun[] {
         .replace(/&quot;/g, '"')
         .trim();
       if (!txt) continue;
-      runs.push(new TextRun({ text: txt, font: "仿宋_GB2312", size: 32 }));
+      runs.push(...makeScriptRuns(txt, baseFont, { bold }));
     }
   }
 
@@ -145,7 +185,7 @@ function htmlToDocxParagraphs(rawHtml: string): Paragraph[] {
       console.log(`[Export] → 题(doc-title): 文本="${plainText.slice(0, 40)}"`);
       if (plainText) {
         paragraphs.push(new Paragraph({
-          children: [new TextRun({ text: plainText, bold: true, font: "方正小标宋简体", size: 44 })],
+          children: makeScriptRuns(plainText, "方正小标宋简体", { bold: true, size: 44 }),
           alignment: AlignmentType.CENTER,
           spacing: docTitleLineSpacing,
         }));
@@ -155,17 +195,17 @@ function htmlToDocxParagraphs(rawHtml: string): Paragraph[] {
       console.log(`[Export] → H1(黑体): 文本="${plainText.slice(0, 40)}"`);
       if (plainText) {
         paragraphs.push(new Paragraph({
-          children: [new TextRun({ text: plainText, bold: true, font: "黑体", size: 32 })],
+          children: makeScriptRuns(plainText, "黑体", { size: 32 }),
           spacing: bodyLineSpacing,
           indent: firstLineChars2,
         }));
       }
     } else if (tagName === "h2") {
       const plainText = innerHtml.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim();
-      console.log(`[Export] → H2(楷体): 文本="${plainText.slice(0, 40)}"`);
+      console.log(`[Export] → H2(楷体_GB2312): 文本="${plainText.slice(0, 40)}"`);
       if (plainText) {
         paragraphs.push(new Paragraph({
-          children: [new TextRun({ text: plainText, bold: true, font: "楷体", size: 32 })],
+          children: makeScriptRuns(plainText, "楷体_GB2312", { size: 32 }),
           spacing: bodyLineSpacing,
           indent: firstLineChars2,
         }));
@@ -175,7 +215,7 @@ function htmlToDocxParagraphs(rawHtml: string): Paragraph[] {
       console.log(`[Export] → H3(仿宋): 文本="${plainText.slice(0, 40)}"`);
       if (plainText) {
         paragraphs.push(new Paragraph({
-          children: [new TextRun({ text: plainText, bold: true, font: "仿宋_GB2312", size: 32 })],
+          children: makeScriptRuns(plainText, "仿宋_GB2312", { bold: true, size: 32 }),
           spacing: bodyLineSpacing,
           indent: firstLineChars2,
         }));
@@ -238,17 +278,16 @@ export async function POST(req: NextRequest) {
 
     const children: Paragraph[] = [];
 
-    // 文档主标题（32pt 固定行距、段前段后 0）
-    if (title) {
-      children.push(new Paragraph({
-        children: [new TextRun({ text: title, bold: true, font: "方正小标宋简体", size: 44 })],
-        alignment: AlignmentType.CENTER,
-        spacing: docTitleLineSpacing,
-      }));
+    // 若 content 中没有公文标题，则把 title 包装成 doc-title 前置；避免 title 与 content 重复渲染
+    let normalizedContent = content || "";
+    const hasDocTitle = /<[^>]+data-type=["']doc-title["']/.test(normalizedContent);
+    if (title && !hasDocTitle) {
+      const safeTitle = title.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      normalizedContent = `<div data-type="doc-title">${safeTitle}</div>\n${normalizedContent}`;
     }
 
     // 正文段落
-    const bodyParagraphs = htmlToDocxParagraphs(content || "");
+    const bodyParagraphs = htmlToDocxParagraphs(normalizedContent);
     children.push(...bodyParagraphs);
 
     const doc = new Document({
