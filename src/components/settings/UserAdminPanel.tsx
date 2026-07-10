@@ -1,6 +1,7 @@
 // ─── 用户权限管理面板（仅超级管理员可见）──────
 // 普通用户以列表展示；管理员/超管以大卡片展示。
-// 点击管理员卡片展开抽屉菜单，可开关该管理员拥有的权限。
+// 点击管理员卡片展开抽屉菜单：可切换管理员类型、开关该管理员拥有的权限。
+// 权限勾选先在前端本地变更，点击「保存」后才提交；保存时仅在卡片内展示加载动画。
 
 "use client";
 
@@ -26,6 +27,8 @@ interface UserItem {
   permissions: string[];
 }
 
+type Role = "user" | "admin" | "super_admin";
+
 const ROLE_LABELS: Record<string, string> = {
   user: "普通用户",
   admin: "管理员",
@@ -45,9 +48,14 @@ export default function UserAdminPanel() {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [perms, setPerms] = useState<PermissionDef[]>([]);
   const [loading, setLoading] = useState(true);
+  // savingId 仅用于控制「卡片内」的加载动画，不再触发全屏加载
   const [savingId, setSavingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // 抽屉内草稿：本地勾选/切换，保存时才提交
+  const [draftRole, setDraftRole] = useState<Role>("user");
+  const [draftPerms, setDraftPerms] = useState<string[]>([]);
 
   const loadData = async () => {
     setLoading(true);
@@ -71,17 +79,33 @@ export default function UserAdminPanel() {
     loadData();
   }, []);
 
-  const saveRoleAndPerms = async (userId: string, role: string, permissions: string[]) => {
+  // 提交（角色 + 权限），采用乐观更新，避免全屏加载
+  const persist = async (userId: string, role: Role, permissions: string[]) => {
     setSavingId(userId);
     try {
       const res = await fetch("/api/admin/users", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, role, permissions }),
+        body: JSON.stringify({
+          userId,
+          role,
+          permissions: role === "super_admin" ? [] : permissions,
+        }),
       });
       const body = await res.json();
       if (body.success) {
-        await loadData();
+        setUsers((prev) =>
+          prev.map((x) =>
+            x.id === userId
+              ? {
+                  ...x,
+                  role,
+                  permissions: role === "super_admin" ? perms.map((p) => p.id) : permissions,
+                }
+              : x,
+          ),
+        );
+        setError(null);
       } else {
         setError(body.error?.message || "保存失败");
       }
@@ -92,19 +116,27 @@ export default function UserAdminPanel() {
     }
   };
 
-  const togglePermission = (user: UserItem, permId: string) => {
-    const next = user.permissions.includes(permId)
-      ? user.permissions.filter((p) => p !== permId)
-      : [...user.permissions, permId];
-    saveRoleAndPerms(user.id, user.role, next);
+  const openDrawer = (u: UserItem) => {
+    if (expandedId === u.id) {
+      setExpandedId(null);
+      return;
+    }
+    // 初始化草稿
+    setExpandedId(u.id);
+    setDraftRole(u.role);
+    setDraftPerms(u.permissions);
   };
 
-  const setRole = (user: UserItem, role: "user" | "admin" | "super_admin") => {
-    const nextPerms = role === "super_admin" ? [] : user.permissions;
-    saveRoleAndPerms(user.id, role, nextPerms);
-    if (expandedId === user.id && role === "super_admin") {
-      setExpandedId(null);
-    }
+  const toggleDraftPerm = (permId: string) => {
+    setDraftPerms((prev) =>
+      prev.includes(permId) ? prev.filter((p) => p !== permId) : [...prev, permId],
+    );
+  };
+
+  const saveDraft = (u: UserItem) => {
+    persist(u.id, draftRole, draftPerms);
+    // 若切换为普通用户，该卡片会移出管理员区，关闭抽屉
+    if (draftRole === "user") setExpandedId(null);
   };
 
   const superAdmins = users.filter((u) => u.role === "super_admin");
@@ -158,61 +190,44 @@ export default function UserAdminPanel() {
       {error && (
         <div className="mb-4 px-3 py-2 bg-red-50 text-red-600 text-xs rounded-lg flex items-center gap-2">
           <X className="w-3.5 h-3.5" /> {error}
+          <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
-      {/* 超级管理员 */}
-      {superAdmins.length > 0 && (
-        <section className="mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <Crown className="w-4 h-4 text-red-500" />
-            <h4 className="text-xs font-medium text-gray-700">超级管理员</h4>
-            <span className="text-[10px] text-gray-400">{superAdmins.length} 人</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {superAdmins.map((u) => (
-              <div key={u.id} className="p-4 bg-white rounded-xl border border-red-100 shadow-sm">
-                <div className="flex items-center gap-3">
-                  {renderAvatar(u)}
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-gray-800 truncate">{u.name || u.email}</div>
-                    <div className="text-[11px] text-gray-400 truncate">{u.email}</div>
-                  </div>
-                </div>
-                <div className="mt-3 pt-3 border-t border-gray-50">
-                  {renderPermissionTags(u)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* 管理员 */}
+      {/* 管理员 / 超级管理员：卡片 + 可展开抽屉 */}
       <section className="mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <UserCog className="w-4 h-4 text-blue-500" />
-            <h4 className="text-xs font-medium text-gray-700">管理员</h4>
-            <span className="text-[10px] text-gray-400">{admins.length} 人</span>
-          </div>
+        <div className="flex items-center gap-2 mb-3">
+          <UserCog className="w-4 h-4 text-blue-500" />
+          <h4 className="text-xs font-medium text-gray-700">管理员</h4>
+          <span className="text-[10px] text-gray-400">{superAdmins.length + admins.length} 人</span>
         </div>
-        {admins.length === 0 ? (
+
+        {superAdmins.length + admins.length === 0 ? (
           <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
             <p className="text-xs text-gray-400">暂无管理员，可在普通用户列表中提升</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {admins.map((u) => {
+            {[...superAdmins, ...admins].map((u) => {
               const expanded = expandedId === u.id;
+              const isSaving = savingId === u.id;
+              const isSuper = u.role === "super_admin";
               return (
-                <div key={u.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div
+                  key={u.id}
+                  className={`bg-white rounded-xl border overflow-hidden ${
+                    isSuper ? "border-red-100" : "border-gray-200"
+                  }`}
+                >
                   <div
                     className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                    onClick={() => setExpandedId(expanded ? null : u.id)}
+                    onClick={() => !isSaving && openDrawer(u)}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
+                        {isSuper && <Crown className="w-4 h-4 text-red-500 flex-shrink-0" />}
                         {renderAvatar(u)}
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-medium text-gray-800 truncate">{u.name || u.email}</div>
@@ -223,7 +238,13 @@ export default function UserAdminPanel() {
                         <span className={`text-[10px] px-2 py-0.5 rounded ${ROLE_COLORS[u.role]}`}>
                           {ROLE_LABELS[u.role]}
                         </span>
-                        {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                        {isSaving ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                        ) : expanded ? (
+                          <ChevronUp className="w-4 h-4 text-gray-400" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-gray-400" />
+                        )}
                       </div>
                     </div>
                     <div className="mt-3">
@@ -231,44 +252,77 @@ export default function UserAdminPanel() {
                     </div>
                   </div>
 
-                  {/* 抽屉：权限开关 */}
+                  {/* 抽屉：切换管理员类型 + 权限开关 */}
                   {expanded && (
                     <div className="border-t border-gray-100 bg-gray-50 p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs font-medium text-gray-700">权限开关</span>
-                        {savingId === u.id && <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {perms.map((p) => {
-                          const checked = u.permissions.includes(p.id);
-                          return (
-                            <label
-                              key={p.id}
-                              className={`flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors ${
-                                checked ? "bg-white border-blue-200" : "bg-white border-gray-200 hover:border-gray-300"
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => togglePermission(u, p.id)}
-                                className="mt-0.5 w-3.5 h-3.5 rounded border-gray-300 text-[#163f3a] focus:ring-[#163f3a]/30"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs text-gray-700">{p.label}</div>
-                                <div className="text-[10px] text-gray-400">{p.description}</div>
-                              </div>
-                            </label>
-                          );
-                        })}
-                      </div>
-                      <div className="mt-4 pt-3 border-t border-gray-200 flex justify-end">
-                        <button
-                          onClick={() => setRole(u, "user")}
-                          disabled={savingId === u.id}
-                          className="text-[11px] text-red-600 hover:text-red-700 hover:bg-red-50 px-2.5 py-1.5 rounded-lg transition-colors"
+                      {/* 管理员类型 */}
+                      <div className="mb-4">
+                        <label className="text-xs font-medium text-gray-700">管理员类型</label>
+                        <select
+                          value={draftRole}
+                          disabled={isSaving}
+                          onChange={(e) => setDraftRole(e.target.value as Role)}
+                          className={`${inputCls} w-auto mt-1`}
                         >
-                          撤销管理员权限
+                          <option value="user">普通用户</option>
+                          <option value="admin">管理员</option>
+                          <option value="super_admin">超级管理员</option>
+                        </select>
+                      </div>
+
+                      {draftRole === "super_admin" ? (
+                        <div className="flex items-center gap-2 text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">
+                          <Crown className="w-3.5 h-3.5" />
+                          超级管理员自动拥有所有权限，无需单独配置
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-medium text-gray-700">权限开关</span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {perms.map((p) => {
+                              const checked = draftPerms.includes(p.id);
+                              return (
+                                <label
+                                  key={p.id}
+                                  className={`flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                                    checked ? "bg-white border-blue-200" : "bg-white border-gray-200 hover:border-gray-300"
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    disabled={isSaving}
+                                    onChange={() => toggleDraftPerm(p.id)}
+                                    className="mt-0.5 w-3.5 h-3.5 rounded border-gray-300 text-[#163f3a] focus:ring-[#163f3a]/30"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs text-gray-700">{p.label}</div>
+                                    <div className="text-[10px] text-gray-400">{p.description}</div>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+
+                      <div className="mt-4 pt-3 border-t border-gray-200 flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setExpandedId(null)}
+                          disabled={isSaving}
+                          className="text-[11px] text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-2.5 py-1.5 rounded-lg transition-colors"
+                        >
+                          取消
+                        </button>
+                        <button
+                          onClick={() => saveDraft(u)}
+                          disabled={isSaving}
+                          className="inline-flex items-center gap-1.5 text-[11px] text-white bg-[#163f3a] hover:bg-[#0f2e2a] px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60"
+                        >
+                          {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                          保存
                         </button>
                       </div>
                     </div>
@@ -293,29 +347,33 @@ export default function UserAdminPanel() {
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
-            {normalUsers.map((u) => (
-              <div key={u.id} className="flex items-center justify-between gap-3 p-3 hover:bg-gray-50">
-                <div className="flex items-center gap-3 min-w-0">
-                  {renderAvatar(u)}
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm text-gray-800 truncate">{u.name || u.email}</div>
-                    <div className="text-[11px] text-gray-400 truncate">{u.email}</div>
+            {normalUsers.map((u) => {
+              const isSaving = savingId === u.id;
+              return (
+                <div key={u.id} className="flex items-center justify-between gap-3 p-3 hover:bg-gray-50">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {renderAvatar(u)}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm text-gray-800 truncate">{u.name || u.email}</div>
+                      <div className="text-[11px] text-gray-400 truncate">{u.email}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />}
+                    <select
+                      value={u.role}
+                      disabled={isSaving}
+                      onChange={(e) => persist(u.id, e.target.value as Role, u.permissions)}
+                      className={`text-xs border rounded-lg px-2 py-1 focus:outline-none ${inputCls} w-auto`}
+                    >
+                      <option value="user">普通用户</option>
+                      <option value="admin">管理员</option>
+                      <option value="super_admin">超级管理员</option>
+                    </select>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <select
-                    value={u.role}
-                    onChange={(e) => setRole(u, e.target.value as any)}
-                    disabled={savingId === u.id}
-                    className={`text-xs border rounded-lg px-2 py-1 focus:outline-none ${inputCls} w-auto`}
-                  >
-                    <option value="user">普通用户</option>
-                    <option value="admin">管理员</option>
-                    <option value="super_admin">超级管理员</option>
-                  </select>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
