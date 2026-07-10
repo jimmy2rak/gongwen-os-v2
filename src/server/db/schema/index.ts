@@ -1,5 +1,5 @@
 // 导出所有数据库表定义
-export { users } from "./users";
+export { users, userPreference } from "./users";
 export { verificationTokens } from "./auth";
 export { sessions } from "./sessions";
 export { documents } from "./documents";

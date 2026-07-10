@@ -44,7 +44,7 @@ export default function HotArticlesPage() {
   const router = useRouter();
   const [items, setItems] = useState<HotArticleItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeCol, setActiveCol] = useState<string>("");
+  const [activePage, setActivePage] = useState<string>("");
   const [activeSrc, setActiveSrc] = useState<string>("");
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
@@ -65,7 +65,7 @@ export default function HotArticlesPage() {
   const loadData = (skipCache = false) => {
     setLoading(true);
     const qs = new URLSearchParams();
-    if (activeCol) qs.set("columnId", activeCol);
+    if (activePage) qs.set("pageName", activePage);
     if (activeSrc) qs.set("sourceId", activeSrc);
     const url = `/api/hot-articles?${qs.toString()}`;
     const fetchFn = () => fetch(url).then((r) => r.json());
@@ -75,10 +75,10 @@ export default function HotArticlesPage() {
       .catch(() => {})
       .finally(() => { if (mounted.current) setLoading(false); });
   };
-  useEffect(() => { mounted.current = true; loadData(); return () => { mounted.current = false; }; }, [activeCol, activeSrc]);
+  useEffect(() => { mounted.current = true; loadData(); return () => { mounted.current = false; };   }, [activePage, activeSrc]);
 
-  // 去重后的筛选选项
-  const cols = Array.from(new Set(items.map((i) => i.columnId).filter(Boolean) as string[])).sort();
+  // 去重后的筛选选项：版面（爬虫配置版块），不再回退到公文类型
+  const pages = Array.from(new Set(items.map((i) => i.pageName).filter(Boolean) as string[])).sort();
   const srcs = Array.from(new Set(items.map((i) => i.sourceName).filter(Boolean) as string[])).sort();
 
   // ── 收藏转文档（收藏到文档管理） ──
@@ -169,6 +169,9 @@ export default function HotArticlesPage() {
   // iframe 预览内容：渲染公文样式 + 黑暗模式适配
   const previewSrcDoc = preview
     ? `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -234,9 +237,9 @@ export default function HotArticlesPage() {
         {/* 筛选栏 — 栏目 pill + 来源下拉 */}
         <div className="flex items-center gap-2 flex-wrap">
           <CategoryFilterPills
-            active={activeCol}
-            items={cols.length ? cols : allCats}
-            onChange={(cat) => setActiveCol(cat)}
+            active={activePage}
+            items={pages}
+            onChange={(cat) => setActivePage(cat)}
           />
           <span className="text-[10px] text-gray-300">|</span>
           <select value={activeSrc} onChange={(e) => setActiveSrc(e.target.value)}

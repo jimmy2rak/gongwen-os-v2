@@ -13,3 +13,12 @@ export const users = sqliteTable("users", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
+
+// ── 用户偏好表（首页快捷入口等个性化配置，按账号同步）──
+export const userPreference = sqliteTable("user_preference", {
+  id: text("id").primaryKey(),                           // "up" + nanoid(12)
+  userId: text("user_id").notNull().unique(),            // 关联 users.id
+  quickEntries: text("quick_entries"),                   // JSON 字符串：可见快捷入口 id 的有序数组
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+

@@ -63,6 +63,16 @@
 }
 
 :root {
+  /* ── 中文字体（@fontsource 自托管，font-family 名为 "Noto Sans SC" / "Noto Serif SC"）── */
+  --font-noto-sans-sc: "Noto Sans SC";
+  --font-noto-serif-sc: "Noto Serif SC";
+  --font-sans: var(--font-noto-sans-sc), "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", system-ui, -apple-system, sans-serif;
+  --font-serif: var(--font-noto-serif-sc), "Songti SC", "SimSun", "STSong", serif;
+  /* 仿宋 / 黑体 / 楷体 的可用回退链（移动端无系统字时落到 Noto） */
+  --font-fangsong: "FangSong", "仿宋_GB2312", "仿宋", var(--font-noto-serif-sc), "Songti SC", serif;
+  --font-heiti: "SimHei", "黑体", var(--font-noto-sans-sc), "PingFang SC", sans-serif;
+  --font-kaiti: "KaiTi", "楷体_GB2312", "楷体", var(--font-noto-serif-sc), serif;
+
   /* ── pen-app 暖米纸质风（仅视觉，不动逻辑） ── */
   --background: #f6f4ef;          /* 暖米纸背景 */
   --foreground: #2b2722;          /* 墨色文字 */

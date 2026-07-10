@@ -8,8 +8,10 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import Link from "next/link";
 import {
   FileText, FileSearch, CheckCircle, LayoutTemplate, Sparkles,
-  TrendingUp, Clock, ArrowRight, BookOpen, PenSquare,
+  TrendingUp, Clock, ArrowRight, BookOpen, Settings,
 } from "lucide-react";
+import { resolveEntries, DEFAULT_QUICK_ENTRIES } from "@/lib/quick-entries";
+import { QuickEntryManager } from "@/components/home/QuickEntryManager";
 
 interface CacheItem {
   data: any;
@@ -37,8 +39,20 @@ export default function HomePage() {
   const [recentDocs, setRecentDocs] = useState<any[]>([]);
   const mounted = useRef(true);
 
+  // ── 首页快捷入口（按账号同步）──
+  const [quickIds, setQuickIds] = useState<string[]>(DEFAULT_QUICK_ENTRIES);
+  const [quickLoading, setQuickLoading] = useState(true);
+  const [mgrOpen, setMgrOpen] = useState(false);
+
   useEffect(() => {
     mounted.current = true;
+    // 拉取当前用户的快捷入口配置（按账号同步）
+    fetch("/api/user/preferences").then((r) => r.json()).then((b) => {
+      if (mounted.current && b.success && Array.isArray(b.quickEntries) && b.quickEntries.length) {
+        setQuickIds(b.quickEntries);
+      }
+    }).catch(() => {}).finally(() => { if (mounted.current) setQuickLoading(false); });
+
     Promise.all([
       cachedFetch("docs:1", () => fetch("/api/documents?pageSize=1").then((r) => r.json())),
       cachedFetch("docs:reviewed", () => fetch("/api/documents?reviewed=true&pageSize=100").then((r) => r.json()).catch(() => ({ success: false }))),
@@ -82,6 +96,24 @@ export default function HomePage() {
       <div className="h-3 w-12 bg-gray-100 rounded" />
     </div>
   );
+
+  // 保存快捷入口配置（按账号同步）
+  const handleSaveQuick = async (ids: string[]) => {
+    try {
+      const res = await fetch("/api/user/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quickEntries: ids }),
+      });
+      const b = await res.json();
+      if (b.success) {
+        setQuickIds(ids);
+        setMgrOpen(false);
+      }
+    } catch { /* 忽略，保留本地顺序 */ }
+  };
+
+  const quickEntries = resolveEntries(quickIds);
 
   return (
     <DashboardLayout title="首页">
@@ -139,27 +171,43 @@ export default function HomePage() {
 
           {/* 快捷入口 */}
           <div className="bg-white rounded-xl border border-[#e7e2d8] p-4">
-            <h3 className="text-xs font-medium text-gray-700 flex items-center gap-1.5 mb-3">
-              <TrendingUp className="w-3.5 h-3.5 text-gray-400" /> 快捷入口
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              <Link href="/quick-draft/quick"
-                className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[#163f3a]/5 text-[#163f3a] hover:bg-[#163f3a]/10 transition-colors text-xs font-medium">
-                <PenSquare className="w-4 h-4" /> 一键出稿
-              </Link>
-              <Link href="/templates"
-                className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors text-xs font-medium">
-                <LayoutTemplate className="w-4 h-4" /> 模板管理
-              </Link>
-              <Link href="/documents"
-                className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors text-xs font-medium">
-                <FileText className="w-4 h-4" /> 全部文档
-              </Link>
-              <Link href="/settings"
-                className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors text-xs font-medium">
-                <Sparkles className="w-4 h-4" /> 系统设置
-              </Link>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5 text-gray-400" /> 快捷入口
+              </h3>
+              <button
+                onClick={() => setMgrOpen(true)}
+                title="管理快捷入口"
+                className="p-1.5 -mr-1.5 text-gray-400 hover:text-[#163f3a] hover:bg-[#163f3a]/5 rounded-lg transition-colors"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
             </div>
+            {quickLoading ? (
+              <div className="grid grid-cols-2 gap-2">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-9 bg-gray-100 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : quickEntries.length === 0 ? (
+              <button onClick={() => setMgrOpen(true)}
+                className="w-full text-xs text-gray-400 py-3 text-center border border-dashed border-gray-200 rounded-lg hover:bg-gray-50">
+                暂无入口，点击右上角齿轮添加
+              </button>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {quickEntries.map((e) => {
+                  const Icon = e.icon;
+                  return (
+                    <Link key={e.id} href={e.href}
+                      className="flex items-center gap-2 px-3 py-2.5 rounded-lg transition-colors text-xs font-medium"
+                      style={{ backgroundColor: `${e.bg}14`, color: e.color }}>
+                      <Icon className="w-4 h-4" /> {e.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -177,6 +225,15 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+
+      {/* 快捷入口管理面板 */}
+      {mgrOpen && (
+        <QuickEntryManager
+          value={quickIds}
+          onSave={handleSaveQuick}
+          onClose={() => setMgrOpen(false)}
+        />
+      )}
     </DashboardLayout>
   );
 }
