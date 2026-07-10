@@ -18,6 +18,12 @@ import {
   GitBranch,
 } from "lucide-react";
 
+// 构建时自动注入的版本号（见 scripts/gen-version.mjs）
+import { APP_VERSION } from "../../lib/version";
+
+// 项目仓库地址（GitHub 猫图标 / 分支版本号点击跳转）
+const REPO_URL = "https://github.com/jimmy2rak/gongwen-os-v2";
+
 // 导航菜单项定义
 const navItems = [
   { href: "/home", label: "首页", icon: Home },
@@ -82,17 +88,19 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       {!collapsed && (
         <div className="p-3 border-t border-sidebar-border flex items-center justify-between">
           <a
-            href="#"
-            onClick={(e) => e.preventDefault()}
+            href={REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex items-center gap-2 text-xs text-sidebar-foreground/40 hover:text-[#163f3a] transition-colors group"
-            title="查看源代码（GitHub）"
+            title={`查看源代码（GitHub）· ${APP_VERSION}`}
           >
             <GitBranch className="w-3.5 h-3.5" />
-            <span className="font-mono">dev-20260707</span>
+            <span className="font-mono">{APP_VERSION}</span>
           </a>
           <a
-            href="#"
-            onClick={(e) => e.preventDefault()}
+            href={REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="w-6 h-6 rounded-full bg-[#e7e2d8] flex items-center justify-center hover:bg-[#163f3a] group transition-colors"
             title="GitHub 仓库"
           >

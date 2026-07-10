@@ -391,3 +391,43 @@
 .gov-doc-preview strong {
   font-weight: 600;
 }
+
+/* ============================================================
+   移动端适配层（仅 max-width: 767px 生效，桌面端 ≥768px 完全不受影响）
+   策略：复用 Sidebar 已有的 collapsed 状态，用纯 CSS 把侧边栏改为离屏抽屉；
+   不新增任何业务逻辑，不改动桌面端渲染、不触碰任何核心代码。
+   ============================================================ */
+
+@layer components {
+  /* 让 Topbar / Sidebar 中使用的 touch-target 工具类真正生效（最小触控 44px） */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+@media (max-width: 767px) {
+  /* 侧边栏：默认离屏隐藏（translateX(-100%)） */
+  aside.bg-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 50;
+    width: 82%;
+    max-width: 300px;
+    transform: translateX(-100%);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+    will-change: transform;
+  }
+
+  /* 展开态（collapsed=false → className 含 w-56）时滑入可视区 */
+  aside.bg-sidebar.w-56 {
+    transform: translateX(0);
+  }
+
+  /* 底部安全区：避免 iPhone Home 指示条遮挡 GitHub / 版本号 */
+  aside.bg-sidebar > div:last-child {
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  }
+}

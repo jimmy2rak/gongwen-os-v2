@@ -4,7 +4,8 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 
@@ -18,12 +19,32 @@ export function DashboardLayout({
   /** 顶部标题右侧的插槽，可以放操作按钮 */
   headerSlot?: React.ReactNode;
 }) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // 桌面端默认展开；移动端（<768px）默认折叠为离屏抽屉，避免首屏遮挡内容
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() =>
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
+  const pathname = usePathname();
+
+  // 移动端：路由切换后自动收起抽屉（桌面端 innerWidth>=768 不触发，零影响）
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setSidebarCollapsed(true);
+    }
+  }, [pathname]);
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-dvh overflow-hidden">
       {/* 左侧导航 */}
       <Sidebar collapsed={sidebarCollapsed} />
+
+      {/* 移动端抽屉遮罩：仅 <768px 显示，点击收起抽屉；桌面端隐藏 */}
+      {!sidebarCollapsed && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          onClick={() => setSidebarCollapsed(true)}
+          aria-hidden="true"
+        />
+      )}
 
       {/* 右侧内容区 */}
       <div className="flex-1 flex flex-col min-w-0">
