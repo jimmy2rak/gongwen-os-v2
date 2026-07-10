@@ -98,7 +98,7 @@ export function Topbar({
         </button>
         <h1 className="text-sm font-medium text-sidebar-foreground flex-shrink-0">{title}</h1>
         {headerSlot && (
-          <div className="flex items-center gap-2 min-w-0 flex-shrink">
+          <div className="flex items-center gap-2 min-w-0 flex-shrink overflow-x-auto md:overflow-visible whitespace-nowrap *:flex-shrink-0">
             {headerSlot}
           </div>
         )}
@@ -110,7 +110,7 @@ export function Topbar({
         <div className="relative" ref={themeMenuRef}>
           <button
             onClick={() => setShowThemeMenu(!showThemeMenu)}
-            className="touch-target p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors"
+            className="touch-target flex items-center justify-center p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors"
             title={
               themeMode === "light" ? "明亮模式" :
               themeMode === "dark" ? "黑暗模式" : "跟随系统"
@@ -151,7 +151,7 @@ export function Topbar({
 
         {/* 首页图标 */}
         <a href="/home"
-          className="touch-target p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors"
+          className="touch-target flex items-center justify-center p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors"
           title="首页">
           <Home className="w-4 h-4" />
         </a>

@@ -283,7 +283,7 @@ export default function HotArticlesPage() {
                 className="bg-white rounded-xl border border-[#e7e2d8] p-4 hover:shadow-sm transition-shadow cursor-pointer"
                 onClick={() => handleRowClick(item)}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex flex-col md:flex-row md:items-start gap-2 md:gap-3">
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-medium text-gray-800 leading-relaxed">{item.title}</h3>
                     <p className="text-xs text-gray-500 mt-1.5 line-clamp-2 leading-relaxed">{item.contentPlain?.slice(0, 120) || "（无摘要）"}</p>
@@ -295,7 +295,7 @@ export default function HotArticlesPage() {
                     </div>
                   </div>
                   {/* 操作按钮 — 阻止点击冒泡，以免触发行点击预览 */}
-                  <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-1 flex-shrink-0 mt-2 md:mt-0 justify-end md:justify-start" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => setPreview(item)}
                       className="p-1.5 rounded text-gray-400 hover:text-cyan-600 hover:bg-cyan-50" title="全屏预览">
                       <Eye className="w-3.5 h-3.5" />

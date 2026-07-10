@@ -475,7 +475,7 @@ export default function DocumentsPage() {
 
         {/* 文档表格 */}
         {!loading && !error && docs.length > 0 && (
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto md:overflow-hidden">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[#c9a55c]/10 bg-[#c9a55c]/[0.06]">
@@ -559,7 +559,7 @@ export default function DocumentsPage() {
                       </td>
                       {/* 操作 */}
                       <td className="px-3 py-3 text-right">
-                        <div className="flex items-center justify-end gap-0.5" style={{ minWidth: 210 }}>
+                        <div className="flex items-center justify-end gap-0.5 min-w-0 md:min-w-[210px]">
                           <button onClick={() => { const nowFav = toggleFavorite(doc.id); setFavIds(new Set(getFavoriteIds())); }}
                             className={`p-1.5 rounded-md transition-colors ${favIds.has(doc.id) ? "text-amber-400 hover:text-amber-500" : "text-gray-300 hover:text-amber-400"}`}
                             title={favIds.has(doc.id) ? "取消收藏" : "收藏"}>

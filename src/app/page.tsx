@@ -25,7 +25,7 @@ import type { Editor } from "@tiptap/react";
 import { ReviewDialog } from "@/components/editor/ReviewDialog";
 import { HistoryModal } from "@/components/editor/HistoryModal";
 
-const HEADER_BUTTON_CLASS = "flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg transition-colors";
+const HEADER_BUTTON_CLASS = "flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg transition-colors flex-shrink-0";
 
 export default function HomePage() {
   const { user, isLoading, fetchUser } = useAuthStore();

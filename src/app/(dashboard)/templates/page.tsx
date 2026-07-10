@@ -400,9 +400,9 @@ export default function TemplatesPage() {
 
   return (
     <DashboardLayout title="模板管理">
-      <div className="flex h-full gap-0">
+      <div className="flex flex-col md:flex-row md:gap-0 h-full">
         {/* ══════════ 左侧：竖排公文类型列表（宽度可拖拽） ══════════ */}
-        <aside style={{ width: asideWidth }} className="flex-shrink-0 border-r border-[#e7e2d8] bg-[#f6f4ef] rounded-l-xl flex flex-col h-full">
+        <aside style={{ width: asideWidth }} className="hidden md:flex md:flex-col md:flex-shrink-0 md:border-r md:border-[#e7e2d8] md:bg-[#f6f4ef] md:rounded-l-xl md:h-full">
           <div className="p-3 border-b border-[#e7e2d8]/60 flex items-center gap-2 flex-shrink-0">
             <FolderOpen className="w-4 h-4 text-gray-400" />
             <span className="text-xs font-medium text-gray-500">公文类型</span>
@@ -475,10 +475,24 @@ export default function TemplatesPage() {
           </div>
         </aside>
 
+        {/* 移动端：公文类型下拉选择（替代收起的左侧竖排菜单，保留模板数 / Skill 数） */}
+        <select
+          value={activeCat}
+          onChange={(e) => setActiveCat(e.target.value)}
+          className="md:hidden w-full flex-shrink-0 border border-[#e7e2d8] bg-white px-3 py-2.5 text-sm text-gray-700 rounded-lg mb-2"
+        >
+          {DOCUMENT_CATEGORIES.map((cat) => (
+            <option key={cat} value={cat}>{cat}（模板 {tplCountByCat[cat] ?? 0} · 技能 {skillCountByCat[cat] ?? 0}）</option>
+          ))}
+          {customCategories.map((cc) => (
+            <option key={cc.name} value={cc.name}>{cc.name}（模板 {tplCountByCat[cc.name] ?? 0} · 技能 {skillCountByCat[cc.name] ?? 0}）</option>
+          ))}
+        </select>
+
         {/* 拖拽分隔条 — 极细线，顶天立地 */}
         <div
           onMouseDown={startResize}
-          className="w-[1px] flex-shrink-0 cursor-col-resize bg-[#e7e2d8]/50 hover:bg-[#c9a55c] transition-colors self-stretch"
+          className="hidden md:block w-[1px] flex-shrink-0 cursor-col-resize bg-[#e7e2d8]/50 hover:bg-[#c9a55c] transition-colors self-stretch"
           title="拖拽调整侧栏宽度"
         />
 

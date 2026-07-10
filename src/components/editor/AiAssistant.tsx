@@ -28,6 +28,11 @@ export function AiAssistant({ editor }: { editor: Editor | null }) {
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
   const [model, setModel] = useState<string>("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // 移动端：AI 面板默认隐藏，点击悬浮机器人图标展开为半屏浮层；桌面端保持右侧固定侧栏
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const panelClass = mobileOpen
+    ? "fixed inset-x-0 bottom-0 top-auto z-50 flex flex-col h-[55vh] bg-white border-t border-gray-200 shadow-2xl md:static md:inset-auto md:top-auto md:h-full md:w-80 md:border-t-0 md:border-l md:flex md:flex-col md:shadow-none"
+    : "hidden md:flex md:w-80 md:border-l md:flex-col md:flex-shrink-0 bg-white border-gray-200";
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
@@ -294,17 +299,23 @@ export function AiAssistant({ editor }: { editor: Editor | null }) {
     streamingText || (messages[messages.length - 1]?.role === "assistant" ? messages[messages.length - 1]?.content : "");
 
   return (
-    <div className="w-80 border-l border-gray-200 bg-white flex flex-col flex-shrink-0">
+    <>
+      <div className={panelClass}>
       {/* 头部 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
         <span className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
           <Sparkles className="w-4 h-4 text-red-500" /> AI 公文助手
         </span>
-        {messages.length > 0 && (
-          <button onClick={() => { setMessages([]); setStreamingText(""); }} title="新建对话" className="text-gray-400 hover:text-gray-600">
-            <RefreshCw className="w-3.5 h-3.5" />
+        <div className="flex items-center gap-2">
+          {messages.length > 0 && (
+            <button onClick={() => { setMessages([]); setStreamingText(""); }} title="新建对话" className="text-gray-400 hover:text-gray-600">
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <button onClick={() => setMobileOpen(false)} title="收起" className="md:hidden text-gray-400 hover:text-gray-600">
+            <X className="w-4 h-4" />
           </button>
-        )}
+        </div>
       </div>
 
       {/* 模型选择 */}
@@ -488,7 +499,10 @@ export function AiAssistant({ editor }: { editor: Editor | null }) {
         </div>
       </div>
 
-      {/* 选中文字浮出操作条 */}
+      {/* 气泡菜单已移至面板之外作为全局浮层，避免被面板的 hidden 影响（见文件末尾） */}
+    </div>
+
+      {/* 选中文字浮出操作条（全局浮层，移动端/桌面端共用，不受面板 hidden 影响） */}
       {selectedText && selectionRect && (
         <div
           className="fixed z-[60] flex items-center gap-0.5 bg-gray-900 text-white rounded-lg shadow-lg px-1 py-1 max-w-[90vw] overflow-x-auto"
@@ -502,7 +516,18 @@ export function AiAssistant({ editor }: { editor: Editor | null }) {
           <BubbleBtn label="翻译" onClick={() => quickAction("translate")} />
         </div>
       )}
-    </div>
+
+      {/* 移动端悬浮 AI 入口（仅 <768px 显示） */}
+      {!mobileOpen && (
+        <button
+          onClick={() => setMobileOpen(true)}
+          title="AI 公文助手"
+          className="md:hidden fixed bottom-4 right-4 z-40 w-12 h-12 rounded-full bg-red-600 text-white shadow-lg flex items-center justify-center active:scale-95 transition-transform"
+        >
+          <Sparkles className="w-6 h-6" />
+        </button>
+      )}
+    </>
   );
 }
 
