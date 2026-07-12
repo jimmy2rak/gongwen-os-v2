@@ -9,11 +9,13 @@ export interface User {
   id: string;
   email: string;
   name: string | null;
+  avatar?: string | null;
 }
 
 interface AuthState {
   user: User | null;         // 当前登录用户，null = 未登录
   isLoading: boolean;        // 是否正在加载用户信息（首次打开页面时）
+  loadError: boolean;        // 网络/超时导致加载失败（用于展示「重试」而非无限转圈）
 
   // Actions
   setUser: (user: User | null) => void;
@@ -26,27 +28,41 @@ interface AuthState {
   logout: () => Promise<void>;
 }
 
+// 请求超时时间：避免 Vercel 冷启动等情况下请求长时间挂起导致页面永远停在「加载中」
+const FETCH_USER_TIMEOUT = 15_000;
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isLoading: true, // 初始为 true，页面加载时会立刻请求 /api/auth/me
+  loadError: false,
 
-  setUser: (user) => set({ user, isLoading: false }),
+  setUser: (user) => set({ user, isLoading: false, loadError: false }),
   setLoading: (isLoading) => set({ isLoading }),
 
-  // 调用 /api/auth/me 获取当前用户
+  // 调用 /api/auth/me 获取当前用户（带超时，避免刷新时卡死）
   fetchUser: async () => {
+    set({ isLoading: true, loadError: false });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_USER_TIMEOUT);
     try {
-      const res = await fetch("/api/auth/me", { credentials: "include" });
+      const res = await fetch("/api/auth/me", {
+        credentials: "include",
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
       if (res.ok) {
         const body = await res.json();
         if (body.success && body.data) {
-          set({ user: body.data, isLoading: false });
+          set({ user: body.data, isLoading: false, loadError: false });
           return;
         }
       }
-      set({ user: null, isLoading: false });
+      // 401/非 success：视为未登录，跳转登录页
+      set({ user: null, isLoading: false, loadError: false });
     } catch {
-      set({ user: null, isLoading: false });
+      clearTimeout(timer);
+      // 网络错误 / 超时：保留登录态未知，展示「重试」而不是无限转圈或误登出
+      set({ isLoading: false, loadError: true });
     }
   },
 

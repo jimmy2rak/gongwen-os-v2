@@ -1,10 +1,12 @@
 // ─── 侧边栏导航 ──────────────────────────────────
 // 左侧导航菜单，包含：公文编辑器、文档管理、模板管理、热点推送、系统设置
+// 顶部 logo 区域替换为「当前用户头像 + 昵称」，点击展开下拉（修改资料 / 退出登录）
 
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import {
   Home,
   PenSquare,
@@ -16,7 +18,11 @@ import {
   Trash2,
   Wand2,
   GitBranch,
+  ChevronDown,
+  LogOut,
+  UserCog,
 } from "lucide-react";
+import { useAuthStore } from "@/stores/auth.store";
 
 // 构建时自动注入的版本号（见 scripts/gen-version.mjs）
 import { APP_VERSION } from "../../lib/version";
@@ -37,8 +43,50 @@ const navItems = [
   { href: "/settings", label: "系统设置", icon: Settings },
 ];
 
+function UserAvatar({ src, name, email }: { src?: string | null; name?: string | null; email?: string | null }) {
+  if (src) {
+    return <img src={src} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />;
+  }
+  const initial = (name || email || "?").trim().charAt(0).toUpperCase();
+  return (
+    <div className="w-8 h-8 rounded-full bg-[#163f3a] text-white flex items-center justify-center text-xs font-medium flex-shrink-0">
+      {initial}
+    </div>
+  );
+}
+
 export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, logout } = useAuthStore();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // 点击外部关闭下拉
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const handleLogout = async () => {
+    setMenuOpen(false);
+    await logout();
+    window.location.href = "/login";
+  };
+
+  const goProfile = () => {
+    setMenuOpen(false);
+    // 打开设置页并定位到「用户画像」标签
+    try { localStorage.setItem("gw-settings-active", "profile"); } catch {}
+    router.push("/settings");
+  };
+
+  const displayName = user?.name || user?.email || "未登录";
 
   return (
     <aside
@@ -46,15 +94,41 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         collapsed ? "w-16" : "w-56"
       }`}
     >
-      {/* Logo 区域 */}
-      <div className="flex items-center gap-2 h-14 px-4 border-b border-sidebar-border">
-        <div className="w-8 h-8 rounded-lg bg-[#163f3a] flex items-center justify-center flex-shrink-0">
-          <span className="text-sm font-bold text-[#f6f4ef]">公</span>
-        </div>
-        {!collapsed && (
-          <span className="font-semibold text-sm text-sidebar-foreground whitespace-nowrap">
-            公文 AI 写作
-          </span>
+      {/* 用户身份区域（替代原 Logo 标题） */}
+      <div className="relative" ref={menuRef}>
+        <button
+          onClick={() => !collapsed && setMenuOpen((o) => !o)}
+          className="flex items-center gap-2 h-14 px-4 border-b border-sidebar-border w-full hover:bg-sidebar-accent transition-colors"
+        >
+          <UserAvatar src={user?.avatar} name={user?.name} email={user?.email} />
+          {!collapsed && (
+            <>
+              <span className="font-medium text-sm text-sidebar-foreground truncate flex-1 text-left">
+                {displayName}
+              </span>
+              <ChevronDown className={`w-4 h-4 text-sidebar-foreground/50 transition-transform ${menuOpen ? "rotate-180" : ""}`} />
+            </>
+          )}
+        </button>
+
+        {/* 下拉菜单：修改资料 / 退出登录（仅展开态显示） */}
+        {!collapsed && menuOpen && (
+          <div className="absolute left-3 right-3 top-14 mt-1 bg-popover border border-sidebar-border rounded-lg shadow-lg py-1 z-50">
+            <button
+              onClick={goProfile}
+              className="flex items-center gap-2 w-full px-3 py-2.5 min-h-[44px] text-sm text-sidebar-foreground hover:bg-sidebar-accent"
+            >
+              <UserCog className="w-4 h-4" />
+              修改资料
+            </button>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 w-full px-3 py-2.5 min-h-[44px] text-sm text-red-600 hover:bg-red-50"
+            >
+              <LogOut className="w-4 h-4" />
+              退出登录
+            </button>
+          </div>
         )}
       </div>
 

@@ -3,8 +3,7 @@
 
 "use client";
 
-import { useAuthStore } from "@/stores/auth.store";
-import { LogOut, User, Menu, Home, Sun, Moon, Monitor } from "lucide-react";
+import { Menu, Home, Sun, Moon, Monitor } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 
 type ThemeMode = "light" | "dark" | "auto";
@@ -35,11 +34,8 @@ export function Topbar({
   /** 标题右侧可以插入额外的按钮（如"保存""导出"等） */
   headerSlot?: React.ReactNode;
 }) {
-  const { user, logout } = useAuthStore();
-  const [showUserMenu, setShowUserMenu] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredTheme);
-  const userMenuRef = useRef<HTMLDivElement>(null);
   const themeMenuRef = useRef<HTMLDivElement>(null);
 
   // 应用主题并持久化
@@ -65,9 +61,6 @@ export function Topbar({
   // 点击其他地方关闭菜单
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
-        setShowUserMenu(false);
-      }
       if (themeMenuRef.current && !themeMenuRef.current.contains(e.target as Node)) {
         setShowThemeMenu(false);
       }
@@ -75,11 +68,6 @@ export function Topbar({
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
-
-  const handleLogout = async () => {
-    await logout();
-    window.location.href = "/login";
-  };
 
   const ThemeIcon = themeMode === "light" ? Sun : themeMode === "dark" ? Moon : Monitor;
 
@@ -155,30 +143,6 @@ export function Topbar({
           title="首页">
           <Home className="w-4 h-4" />
         </a>
-        {user && (
-          <div className="relative" ref={userMenuRef}>
-            <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="touch-target flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-sidebar-accent text-sm text-sidebar-foreground/80 ml-1"
-            >
-              <User className="w-4 h-4" />
-              <span>{user.name || user.email}</span>
-            </button>
-
-            {/* 下拉菜单 */}
-            {showUserMenu && (
-              <div className="absolute right-0 top-full mt-1 w-40 bg-popover border border-sidebar-border rounded-lg shadow-lg py-1 z-50">
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 w-full px-3 py-2 min-h-[44px] text-sm text-sidebar-foreground hover:bg-sidebar-accent"
-                >
-                  <LogOut className="w-4 h-4" />
-                  退出登录
-                </button>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </header>
   );

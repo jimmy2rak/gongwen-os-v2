@@ -58,9 +58,28 @@ export default function SettingsPage() {
 
   return (
     <DashboardLayout title="系统设置">
-      <div className="p-4 md:p-6 max-w-6xl mx-auto">
-        <div className="flex gap-6">
-          <aside className="w-56 flex-shrink-0">
+      <div className="max-w-6xl mx-auto">
+        {/* 移动端：顶部可滑动二级分类菜单（参考「一键初稿」二级导航） */}
+        <div className="md:hidden flex items-center gap-1 px-4 py-2 border-b border-sidebar-border bg-white overflow-x-auto sticky top-0 z-20">
+          {SETTINGS_MENUS.filter((m) => !m.requiredSuper || isSuper).map((m) => {
+            const Icon = m.icon;
+            const on = active === m.id;
+            return (
+              <button
+                key={m.id}
+                onClick={() => setActive(m.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-colors ${
+                  on ? "bg-[#163f3a]/10 text-[#163f3a] font-medium" : "text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {m.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="p-4 md:p-6 flex gap-6">
+          <aside className="hidden md:flex w-56 flex-shrink-0 flex-col">
             <div className="flex items-center gap-1.5 px-3 mb-2 text-xs text-gray-400">
               <SettingsIcon className="w-3.5 h-3.5" />
               <span>设置项</span>

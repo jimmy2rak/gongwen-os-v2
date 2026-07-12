@@ -44,7 +44,6 @@ export default function HotArticlesPage() {
   const router = useRouter();
   const [items, setItems] = useState<HotArticleItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activePage, setActivePage] = useState<string>("");
   const [activeSrc, setActiveSrc] = useState<string>("");
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
@@ -64,22 +63,19 @@ export default function HotArticlesPage() {
 
   const loadData = (skipCache = false) => {
     setLoading(true);
-    const qs = new URLSearchParams();
-    if (activePage) qs.set("pageName", activePage);
-    if (activeSrc) qs.set("sourceId", activeSrc);
-    const url = `/api/hot-articles?${qs.toString()}`;
-    const fetchFn = () => fetch(url).then((r) => r.json());
-    const promise = skipCache ? fetchFn() : cachedFetch(url, fetchFn);
+    const fetchFn = () => fetch("/api/hot-articles").then((r) => r.json());
+    const promise = skipCache ? fetchFn() : cachedFetch("/api/hot-articles", fetchFn);
     promise
       .then((b) => { if (mounted.current && b.success) setItems((b.data as HotArticleItem[]) || []); })
       .catch(() => {})
       .finally(() => { if (mounted.current) setLoading(false); });
   };
-  useEffect(() => { mounted.current = true; loadData(); return () => { mounted.current = false; };   }, [activePage, activeSrc]);
+  useEffect(() => { mounted.current = true; loadData(); return () => { mounted.current = false; };   }, []);
 
-  // 去重后的筛选选项：版面（爬虫配置版块），不再回退到公文类型
-  const pages = Array.from(new Set(items.map((i) => i.pageName).filter(Boolean) as string[])).sort();
+  // 去重后的筛选选项：来源（人民日报 / 新华网 等大分类）
   const srcs = Array.from(new Set(items.map((i) => i.sourceName).filter(Boolean) as string[])).sort();
+  // 客户端按来源筛选（不依赖 API 的 source_id 字段，保证 pill 一定生效）
+  const visibleItems = activeSrc ? items.filter((i) => i.sourceName === activeSrc) : items;
 
   // ── 收藏转文档（收藏到文档管理） ──
   const handleFavToDoc = async () => {
@@ -234,19 +230,14 @@ export default function HotArticlesPage() {
           </button>
         </div>
 
-        {/* 筛选栏 — 栏目 pill + 来源下拉 */}
+        {/* 筛选栏 — 来源 pill 菜单（人民日报 / 新华网 等大分类） */}
         <div className="flex items-center gap-2 flex-wrap">
           <CategoryFilterPills
-            active={activePage}
-            items={pages}
-            onChange={(cat) => setActivePage(cat)}
+            active={activeSrc}
+            items={srcs}
+            onChange={(cat) => setActiveSrc(cat)}
+            allLabel="全部来源"
           />
-          <span className="text-[10px] text-gray-300">|</span>
-          <select value={activeSrc} onChange={(e) => setActiveSrc(e.target.value)}
-            className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-[#163f3a]/30">
-            <option value="">全部来源</option>
-            {srcs.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
         </div>
 
         {/* 列表 */}
@@ -273,14 +264,14 @@ export default function HotArticlesPage() {
               </div>
             ))}
           </div>
-        ) : items.length === 0 ? (
+        ) : visibleItems.length === 0 ? (
           <div className="text-center py-16 bg-gray-50/80 rounded-xl border border-dashed border-gray-200">
             <Newspaper className="w-10 h-10 text-gray-200 mx-auto mb-3" />
             <p className="text-sm text-gray-400">暂无热点文章，请等待超管运行爬虫入库</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <div
                 key={item.id}
                 className="bg-white rounded-xl border border-[#e7e2d8] p-4 hover:shadow-sm transition-shadow cursor-pointer"
@@ -293,7 +284,6 @@ export default function HotArticlesPage() {
                     <div className="flex items-center gap-3 mt-2 flex-wrap text-[10px] text-gray-400">
                       {item.crawlDate && <span className="flex items-center gap-1"><Clock className="w-2.5 h-2.5" />{item.crawlDate}</span>}
                       {item.sourceName && <span className="flex items-center gap-1"><Tag className="w-2.5 h-2.5" />{item.sourceName}</span>}
-                      {item.pageName && <span className="px-1.5 py-0.5 bg-gray-100 rounded">{item.pageName}</span>}
                       {item.columnId && <span className="px-1.5 py-0.5 bg-[#163f3a]/10 text-[#163f3a] rounded">{item.columnId}</span>}
                     </div>
                   </div>
