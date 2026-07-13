@@ -12,8 +12,9 @@ import { CustomDialog } from "@/components/ui/CustomDialog";
 import Link from "next/link";
 import {
   BookOpen, FileText, XCircle, Search, Filter,
-  ExternalLink, Trash2, Clock, UserCheck, Eye,
+  ExternalLink, Trash2, Clock, UserCheck, Eye, MessageSquare,
 } from "lucide-react";
+import { KnowledgeChat } from "@/components/ai/KnowledgeChat";
 import { getAllCategories, getCategoryColor } from "@/types";
 import { cachedFetch, invalidateCache } from "@/lib/cache";
 
@@ -37,6 +38,7 @@ export default function KnowledgePage() {
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [previewDoc, setPreviewDoc] = useState<KnowledgeDoc | null>(null);
   const [confirmDel, setConfirmDel] = useState<{ docId: string; title: string } | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
   const allCats = getAllCategories();
 
   const showToast = (type: "success" | "error", msg: string) => {
@@ -217,6 +219,16 @@ export default function KnowledgePage() {
           </div>
         )}
       </div>
+
+      {/* 知识库 AI 问答悬浮入口（@ 文章 / 技能） */}
+      <button
+        onClick={() => setChatOpen(true)}
+        title="AI 问答（@ 选择文章 / 选择技能）"
+        className="fixed bottom-5 right-5 z-40 w-12 h-12 rounded-full bg-red-600 text-white shadow-lg flex items-center justify-center hover:bg-red-700 active:scale-95 transition-transform"
+      >
+        <MessageSquare className="w-6 h-6" />
+      </button>
+      <KnowledgeChat open={chatOpen} onClose={() => setChatOpen(false)} />
 
       {/* 预览弹窗（复刻文档管理预览） */}
       <PreviewModal

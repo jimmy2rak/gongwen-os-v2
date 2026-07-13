@@ -56,3 +56,12 @@ export function buildSelectionInstruction(
       return wrapped;
   }
 }
+
+/** 未选中任何文字时，默认对「整篇公文」提要求：把全文作为上下文交给模型 */
+export function buildDocumentInstruction(userPrompt: string, docText: string): string {
+  const text = (docText || "").trim();
+  if (!text) {
+    return userPrompt || "请帮我处理这篇公文。";
+  }
+  return `请基于下面这篇完整的公文进行处理，你的操作（续写 / 润色 / 修改 / 分析等）应作用于整篇全文：\n用户要求：${userPrompt || "请帮我处理这篇公文"}\n\n────── 全文内容 ──────\n"""\n${text}\n"""`;
+}

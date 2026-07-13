@@ -28,6 +28,7 @@ import { useEffect, useRef } from "react";
 import type { Editor } from "@tiptap/react";
 import type { DocMetaInfo } from "@/types";
 import { looksLikeMarkdown, markdownToGovDocHtml } from "@/lib/markdown";
+import { useEditorStore } from "@/stores/editor.store";
 import "./editor.css";
 
 interface DocEditorProps {
@@ -147,6 +148,18 @@ export function DocEditor({
       editor.off("blur", onBlur);
     };
   }, [editor, onSelectionChange]);
+
+  // 编辑器卸载（切换文档 / 离开页面）时清空全局选区状态，
+  // 避免旧文档的选中文字残留到全局 store，被后续「无选区」指令误当成选中内容抓取。
+  useEffect(() => {
+    return () => {
+      const st = useEditorStore.getState();
+      if (st.selectedText || st.selectionRect) {
+        st.setSelectedText("");
+        st.setSelectionRect(null);
+      }
+    };
+  }, []);
 
   if (!editor) {
     return (

@@ -1,6 +1,7 @@
 // 导出所有数据库表定义
 export { users, userPreference, adminPermission, userPermission } from "./users";
 export { userMemory } from "./memory";
+export { aiChatLog } from "./chatlog";
 export { verificationTokens } from "./auth";
 export { sessions } from "./sessions";
 export { documents } from "./documents";

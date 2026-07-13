@@ -8,10 +8,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { Editor } from "@tiptap/react";
 import { useEditorStore } from "@/stores/editor.store";
-import { buildSelectionInstruction, ChatMessage } from "@/server/lib/ai/prompts";
+import { buildSelectionInstruction, buildDocumentInstruction, ChatMessage } from "@/server/lib/ai/prompts";
 import { buildGlobalContext } from "@/lib/ai/context";
 import { getGlobalSkills } from "@/lib/global-skill-store";
-import { Sparkles, Send, Copy, CornerDownLeft, Replace, X, RefreshCw, AlertCircle, Settings, ChevronDown, ChevronRight, Check, Quote } from "lucide-react";
+import { MentionInput, type MentionItem } from "@/components/ai/MentionInput";
+import { Sparkles, Send, Copy, CornerDownLeft, Replace, X, RefreshCw, AlertCircle, Settings, ChevronDown, ChevronRight, Check, Quote, FileText } from "lucide-react";
 
 interface ModelOption {
   provider: string;
@@ -39,6 +40,8 @@ export function AiAssistant({ editor }: { editor: Editor | null }) {
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // 编辑器侧 @ 引用的文章 id 集合（随对话传给 /api/ai/chat 作为参考文章）
+  const [selectedArticleIds, setSelectedArticleIds] = useState<Set<string>>(new Set());
 
   const abortRef = useRef<AbortController | null>(null);
   const streamingTextRef = useRef("");
@@ -101,6 +104,29 @@ export function AiAssistant({ editor }: { editor: Editor | null }) {
     }
     return map;
   }, [allSkills]);
+
+  // / 提及可用的技能列表（DB Skills + 全局 Skills）
+  const mentionSkills = useCallback((): MentionItem[] => {
+    return allSkills
+      .map((s) => ({ id: s.id, label: s.name, sub: s.category }))
+      .concat(globalSkills.map((s) => ({ id: s.id, label: s.name, sub: s.category || "全局" })));
+  }, [allSkills, globalSkills]);
+
+  // @ 提及：异步搜索用户文章（文档库 + 已审阅知识库）
+  const resolveArticles = useCallback(async (q: string): Promise<MentionItem[]> => {
+    try {
+      const url = `/api/references?search=${encodeURIComponent(q)}`;
+      const b = await (await fetch(url)).json();
+      if (!b.success || !Array.isArray(b.data)) return [];
+      return b.data.map((d: any) => ({
+        id: d.id,
+        label: d.title,
+        sub: `${d.category || ""}${d.reviewed ? " · 已审阅" : " · 文档库"}`,
+      }));
+    } catch {
+      return [];
+    }
+  }, []);
 
   // 构建 Skill 上下文文本（供 AI 调用注入）
   const buildSkillContext = useCallback((): string => {
@@ -168,6 +194,7 @@ export function AiAssistant({ editor }: { editor: Editor | null }) {
     provider: string;
     model: string;
     systemExtra?: string;
+    articleIds?: string[];
     signal: AbortSignal;
     onToken: (t: string) => void;
     onError: (m: string) => void;
@@ -180,6 +207,7 @@ export function AiAssistant({ editor }: { editor: Editor | null }) {
         provider: opts.provider,
         model: opts.model,
         systemExtra: opts.systemExtra,
+        articleIds: opts.articleIds || [],
       }),
       signal: opts.signal,
     });
@@ -242,6 +270,7 @@ export function AiAssistant({ editor }: { editor: Editor | null }) {
         provider,
         model: modelName,
         systemExtra,
+        articleIds: [...selectedArticleIds],
         signal: controller.signal,
         onToken: (t) => {
           streamingTextRef.current += t;
@@ -267,11 +296,16 @@ export function AiAssistant({ editor }: { editor: Editor | null }) {
     send(buildSelectionInstruction(action, selectedText));
   };
 
-  const handleSend = () => {
-    const text = input.trim();
+  const handleSend = (raw?: string) => {
+    const text = (raw ?? input).trim();
     if (!text) return;
-    if (selectedText) {
+    if (selectedText.trim()) {
+      // 有选中文字：针对选中片段发指令（保留需求2的选区保持）
       send(buildSelectionInstruction("custom", selectedText, text));
+    } else if (editor) {
+      // 未选中任何文字：默认对整篇公文提要求
+      const docText = editor.state.doc.textContent || "";
+      send(buildDocumentInstruction(text, docText));
     } else {
       send(text);
     }
@@ -482,7 +516,7 @@ export function AiAssistant({ editor }: { editor: Editor | null }) {
       {/* 输入区 */}
       <div className="px-3 py-2 border-t border-gray-200">
         {/* 已选文本指示条：焦点移到 Chatbox 时仍保留，可一键清除 */}
-        {selectedText && (
+        {selectedText.trim() ? (
           <div className="flex items-center gap-1.5 px-2 py-1.5 mb-2 rounded-lg bg-[#163f3a]/8 border border-[#163f3a]/15">
             <Quote className="w-3.5 h-3.5 text-[#163f3a] flex-shrink-0" />
             <span className="text-[11px] text-gray-600 truncate flex-1">
@@ -492,25 +526,48 @@ export function AiAssistant({ editor }: { editor: Editor | null }) {
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
+        ) : (
+          <div className="flex items-center gap-1.5 px-2 py-1.5 mb-2 rounded-lg bg-gray-50 border border-gray-200">
+            <FileText className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+            <span className="text-[11px] text-gray-500 truncate flex-1">
+              未选中文字，将对整篇公文作答（可在左侧选中文字以限定范围）
+            </span>
+          </div>
         )}
+
+        {/* @ 引用的文章 chips */}
+        {selectedArticleIds.size > 0 && (
+          <div className="flex items-center gap-1 mb-2">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded-full bg-[#163f3a]/10 text-[#163f3a]">
+              <FileText className="w-2.5 h-2.5" /> 已引用 {selectedArticleIds.size} 篇文章
+              <button onClick={() => setSelectedArticleIds(new Set())} title="清除引用" className="hover:text-red-600">
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          </div>
+        )}
+
         <div className="flex items-end gap-2">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
-            }}
-            rows={2}
-            placeholder={selectedText ? "输入自定义指令（将作用于选中文字）..." : "输入公文指令或问题..."}
-            className="flex-1 text-xs border border-gray-200 rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-red-300"
-          />
+          <div className="flex-1">
+            <MentionInput
+              value={input}
+              onChange={setInput}
+              onSend={(v) => handleSend(v)}
+              disabled={streaming}
+              placeholder={selectedText ? "输入自定义指令（作用于选中文字）…  @ 选文章 / 选技能" : "输入公文指令或问题…  @ 选文章 / 选技能"}
+              resolveArticles={resolveArticles}
+              skills={mentionSkills()}
+              onPickArticle={(id) => setSelectedArticleIds((p) => new Set(p).add(id))}
+              onPickSkill={(id) => setSelectedSkillIds((p) => new Set(p).add(id))}
+            />
+          </div>
           {streaming ? (
             <button onClick={cancel} title="停止生成"
               className="flex-shrink-0 p-2 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300">
               <X className="w-4 h-4" />
             </button>
           ) : (
-            <button onClick={handleSend} disabled={!model || !input.trim()}
+            <button onClick={() => handleSend()} disabled={!model || !input.trim()}
               title="发送"
               className="flex-shrink-0 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300">
               <Send className="w-4 h-4" />

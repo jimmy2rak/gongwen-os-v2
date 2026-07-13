@@ -4,10 +4,11 @@
 // 4) 将厂商 SSE 原样透传回前端（text/event-stream）。
 
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/server/db";
-import { apiKeys } from "@/server/db/schema";
+import { db, client } from "@/server/db";
+import { nanoid } from "nanoid";
+import { apiKeys, documents } from "@/server/db/schema";
 import { getServerUser } from "@/server/auth/guard";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { decryptApiKey } from "@/server/lib/crypto";
 import { getProvider, isValidProvider } from "@/server/lib/ai/providers";
 import { getSystemMiniCPMConfig } from "@/server/lib/ai/system-minicpm";
@@ -22,6 +23,7 @@ interface ChatBody {
   provider?: string;
   model?: string;
   systemExtra?: string;
+  articleIds?: string[];
 }
 
 export async function POST(req: NextRequest) {
@@ -46,6 +48,29 @@ export async function POST(req: NextRequest) {
     userMemoryPrompt = buildUserMemoryPrompt(mem);
   } catch (e) {
     console.error("[ai/chat] 读取用户记忆失败:", e);
+  }
+
+  // 解析 @ 引用的参考文章（知识库 / 编辑器提问通过 articleIds 传入）
+  let articleContext = "";
+  if (Array.isArray(body.articleIds) && body.articleIds.length > 0) {
+    try {
+      const ids = body.articleIds.filter((x) => typeof x === "string" && x).slice(0, 10);
+      if (ids.length > 0) {
+        const rows = await db
+          .select({ title: documents.title, content: documents.content })
+          .from(documents)
+          .where(and(eq(documents.userId, user.id), inArray(documents.id, ids)));
+        if (rows.length > 0) {
+          articleContext =
+            "【参考文章】\n" +
+            rows
+              .map((r) => `## ${r.title || "未命名"}\n${typeof r.content === "string" ? r.content : ""}`)
+              .join("\n\n");
+        }
+      }
+    } catch (e) {
+      console.error("[ai/chat] 读取参考文章失败:", e);
+    }
   }
 
   if (!provider || !isValidProvider(provider)) {
@@ -106,7 +131,7 @@ export async function POST(req: NextRequest) {
   }
 
   const upstreamUrl = `${baseUrl}/chat/completions`;
-  const systemExtra = [body.systemExtra, userMemoryPrompt].filter(Boolean).join("\n\n");
+  const systemExtra = [body.systemExtra, userMemoryPrompt, articleContext].filter(Boolean).join("\n\n");
   const systemPrompt = buildSystemPrompt(systemExtra);
   const payload = JSON.stringify({
     model,
@@ -153,7 +178,52 @@ export async function POST(req: NextRequest) {
     model,
   }).catch((e) => console.error("[ai/chat] captureUserMemory 失败:", e));
 
-  return new Response(upstream.body, {
+  // 记录对话历史（供「记忆手动更新」抓取全部聊天历史）
+  // 用 TransformStream 包裹流式响应：一边原样透传前端，一边累积助手文本用于落库
+  const decoder = new TextDecoder();
+  let assistantBuf = "";
+  const logTransform = new TransformStream({
+    transform(chunk, controller) {
+      controller.enqueue(chunk);
+      try {
+        const s = typeof chunk === "string" ? chunk : decoder.decode(chunk, { stream: true });
+        for (const line of s.split("\n")) {
+          const t = line.trim();
+          if (!t.startsWith("data:")) continue;
+          const data = t.slice(5).trim();
+          if (!data || data === "[DONE]") continue;
+          try {
+            const json = JSON.parse(data);
+            const delta = json?.choices?.[0]?.delta?.content;
+            if (delta) assistantBuf += delta;
+          } catch {}
+        }
+      } catch {}
+    },
+    async flush() {
+      try {
+        const now = Math.floor(Date.now() / 1000);
+        const lastUser = [...safeMessages].reverse().find((m) => m.role === "user");
+        if (lastUser) {
+          await client.execute({
+            sql: "INSERT INTO ai_chat_log (id, user_id, role, content, created_at) VALUES (?, ?, 'user', ?, ?)",
+            args: [`cl${nanoid(12)}`, user.id, lastUser.content, now],
+          });
+        }
+        if (assistantBuf.trim()) {
+          await client.execute({
+            sql: "INSERT INTO ai_chat_log (id, user_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)",
+            args: [`cl${nanoid(12)}`, user.id, assistantBuf, now],
+          });
+        }
+      } catch (e) {
+        console.error("[ai/chat] 记录对话历史失败:", e);
+      }
+    },
+  });
+
+  const stream = upstream.body ? upstream.body.pipeThrough(logTransform) : upstream.body;
+  return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",

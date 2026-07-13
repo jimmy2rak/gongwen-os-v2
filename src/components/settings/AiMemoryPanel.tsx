@@ -7,7 +7,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, RotateCcw, Brain } from "lucide-react";
+import { Save, RotateCcw, Brain, RefreshCw } from "lucide-react";
 import { CustomDialog } from "@/components/ui/CustomDialog";
 
 type Memory = {
@@ -31,6 +31,8 @@ export default function AiMemoryPanel() {
   const [saving, setSaving] = useState(false);
   const [savedTip, setSavedTip] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [extractTip, setExtractTip] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -53,7 +55,8 @@ export default function AiMemoryPanel() {
   const dirty =
     draft.personalInfo !== memory.personalInfo ||
     draft.languageHabits !== memory.languageHabits ||
-    draft.writingEnhancements !== memory.writingEnhancements;
+    draft.writingEnhancements !== memory.writingEnhancements ||
+    draft.autoNotes !== memory.autoNotes;
 
   const save = async () => {
     setSaving(true);
@@ -66,6 +69,7 @@ export default function AiMemoryPanel() {
           personalInfo: draft.personalInfo,
           languageHabits: draft.languageHabits,
           writingEnhancements: draft.writingEnhancements,
+          autoNotes: draft.autoNotes,
         }),
       });
       const d = await r.json();
@@ -99,6 +103,32 @@ export default function AiMemoryPanel() {
     setSaving(false);
   };
 
+  // 手动更新：强制抓取全部公文/初稿/大纲/知识库/聊天历史，生成记忆草稿
+  const refresh = async () => {
+    setRefreshing(true);
+    setExtractTip(null);
+    try {
+      const r = await fetch("/api/user/memory/refresh", { method: "POST" });
+      const d = await r.json();
+      if (d.success && d.extracted) {
+        const e = d.extracted;
+        setDraft((prev) => ({
+          personalInfo: e.personalInfo || prev.personalInfo,
+          languageHabits: e.languageHabits || prev.languageHabits,
+          writingEnhancements: e.writingEnhancements || prev.writingEnhancements,
+          autoNotes: e.notes || prev.autoNotes,
+        }));
+        setExtractTip("已根据全部公文/初稿/大纲/知识库/聊天历史生成记忆草稿，请检查后点「保存」");
+      } else {
+        setExtractTip(d.error?.message || "生成失败");
+      }
+    } catch {
+      setExtractTip("网络错误，请重试");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (loading) {
     return <div className="text-xs text-gray-400 py-10 text-center">加载中…</div>;
   }
@@ -116,16 +146,24 @@ export default function AiMemoryPanel() {
         </div>
         <div className="flex items-center gap-2">
           {savedTip && <span className="text-[11px] text-green-600">已保存</span>}
+          {extractTip && <span className="text-[11px] text-[#163f3a] max-w-[200px] truncate" title={extractTip}>{extractTip}</span>}
+          <button
+            onClick={refresh}
+            disabled={refreshing || saving}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-[#163f3a] bg-white border border-[#163f3a]/30 rounded-lg hover:bg-[#163f3a]/5 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} /> {refreshing ? "生成中…" : "手动更新"}
+          </button>
           <button
             onClick={reset}
-            disabled={saving}
+            disabled={saving || refreshing}
             className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
           >
             <RotateCcw className="w-3.5 h-3.5" /> 清空手动记忆
           </button>
           <button
             onClick={save}
-            disabled={saving || !dirty}
+            disabled={saving || refreshing || !dirty}
             className="flex items-center gap-1 px-3 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300"
           >
             <Save className="w-3.5 h-3.5" /> {saving ? "保存中…" : "保存"}
@@ -158,18 +196,16 @@ export default function AiMemoryPanel() {
 
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-gray-500">系统自动学习笔记（只读）</span>
-            <span className="text-[10px] text-gray-300">由 AI 对话自动提取，不可手动编辑</span>
+            <span className="text-xs text-gray-500">系统自动学习笔记（可编辑）</span>
+            <span className="text-[10px] text-gray-300">由 AI 对话自动提取 / 点「手动更新」生成，可修改</span>
           </div>
-          {draft.autoNotes.trim() ? (
-            <pre className="whitespace-pre-wrap text-xs text-gray-600 leading-relaxed bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-60 overflow-auto">
-{draft.autoNotes}
-            </pre>
-          ) : (
-            <div className="text-xs text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-lg p-3">
-              暂无自动笔记。在与公文助手对话、生成初稿/大纲时，系统会自动学习你的写作偏好并记录在此。
-            </div>
-          )}
+          <textarea
+            value={draft.autoNotes}
+            onChange={(e) => setDraft({ ...draft, autoNotes: e.target.value })}
+            rows={5}
+            placeholder="暂无自动笔记。与公文助手对话、生成初稿/大纲时系统会自动学习；或点右上角「手动更新」从全部公文/初稿/大纲/知识库/聊天历史生成。"
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 leading-relaxed focus:outline-none focus:ring-1 focus:ring-red-300 resize-y bg-gray-50"
+          />
         </div>
       </div>
 
