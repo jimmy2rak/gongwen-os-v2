@@ -12,6 +12,7 @@ import { decryptApiKey } from "@/server/lib/crypto";
 import { getProvider, isValidProvider } from "@/server/lib/ai/providers";
 import { getSystemMiniCPMConfig } from "@/server/lib/ai/system-minicpm";
 import { buildSystemPrompt, ChatMessage } from "@/server/lib/ai/prompts";
+import { getUserMemory, buildUserMemoryPrompt, captureUserMemory } from "@/server/lib/ai/user-memory";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,6 +38,15 @@ export async function POST(req: NextRequest) {
   }
 
   const { messages, provider, model } = body;
+
+  // 读取当前用户的 AI 记忆，注入到系统提示词（按账号持久化）
+  let userMemoryPrompt = "";
+  try {
+    const mem = await getUserMemory(user.id);
+    userMemoryPrompt = buildUserMemoryPrompt(mem);
+  } catch (e) {
+    console.error("[ai/chat] 读取用户记忆失败:", e);
+  }
 
   if (!provider || !isValidProvider(provider)) {
     return NextResponse.json({ success: false, error: { message: "未指定有效厂商" } }, { status: 400 });
@@ -96,7 +106,8 @@ export async function POST(req: NextRequest) {
   }
 
   const upstreamUrl = `${baseUrl}/chat/completions`;
-  const systemPrompt = buildSystemPrompt(body.systemExtra);
+  const systemExtra = [body.systemExtra, userMemoryPrompt].filter(Boolean).join("\n\n");
+  const systemPrompt = buildSystemPrompt(systemExtra);
   const payload = JSON.stringify({
     model,
     messages: [{ role: "system", content: systemPrompt }, ...safeMessages],
@@ -131,6 +142,16 @@ export async function POST(req: NextRequest) {
       { status: 502 }
     );
   }
+
+  // 自动记忆：本轮对话结束后后台从对话中提取用户写作偏好并回写
+  // （不阻塞流式响应，失败静默）
+  captureUserMemory({
+    userId: user.id,
+    messages: safeMessages,
+    apiKey,
+    baseUrl,
+    model,
+  }).catch((e) => console.error("[ai/chat] captureUserMemory 失败:", e));
 
   return new Response(upstream.body, {
     headers: {

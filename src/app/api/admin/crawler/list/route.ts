@@ -5,16 +5,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { client } from "@/server/db";
 import { getServerUser } from "@/server/auth/guard";
-import { isSuperAdmin } from "@/server/auth/super-admin";
+import { hasPermission } from "@/server/auth/permission";
 
 export async function GET(req: NextRequest) {
   const user = await getServerUser();
   if (!user) {
     return NextResponse.json({ success: false, error: { message: "未登录" } }, { status: 401 });
   }
-  if (!(await isSuperAdmin(user.id))) {
+  if (!(await hasPermission(user.id, "crawler_manage"))) {
     return NextResponse.json(
-      { success: false, error: { message: "无权限：仅超级管理员可访问" } },
+      { success: false, error: { message: "无权限：仅超级管理员或拥有「爬虫热点推送配置」权限可访问" } },
       { status: 403 }
     );
   }

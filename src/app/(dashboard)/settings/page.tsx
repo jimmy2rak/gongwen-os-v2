@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAuthStore } from "@/stores/auth.store";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { KeyRound, User, Eye, Settings as SettingsIcon, Sparkles, UserCheck, Globe, Terminal, Shield } from "lucide-react";
+import { KeyRound, User, Eye, Settings as SettingsIcon, Sparkles, UserCheck, Globe, Terminal, Shield, Brain } from "lucide-react";
 import ApiConfigPanel from "@/components/settings/ApiConfigPanel";
 import ProfilePanel from "@/components/settings/ProfilePanel";
 import GlobalSkillPanel from "@/components/settings/GlobalSkillPanel";
 import ReviewerPanel from "@/components/settings/ReviewerPanel";
 import CrawlerAdminPanel from "@/components/settings/CrawlerAdminPanel";
 import UserAdminPanel from "@/components/settings/UserAdminPanel";
+import AiMemoryPanel from "@/components/settings/AiMemoryPanel";
 
 interface SettingsMenu {
   id: string;
@@ -27,6 +29,7 @@ const SETTINGS_MENUS: SettingsMenu[] = [
   { id: "reviewer", label: "审阅人管理", desc: "配置公文审阅人名单", icon: UserCheck, ready: true },
   { id: "users", label: "用户权限管理", desc: "分配管理员权限并管理权限开关", icon: Shield, ready: true, requiredSuper: true },
   { id: "crawler", label: "爬虫热点推送配置", desc: "超管专属：数据源与一键爬虫脚本", icon: Terminal, ready: true, requiredSuper: true },
+  { id: "memory", label: "AI 记忆", desc: "按账号持久化的 AI 写作记忆", icon: Brain, ready: true },
   { id: "menu", label: "菜单可见性", desc: "自定义菜单显示", icon: Eye, ready: false },
 ];
 
@@ -36,7 +39,10 @@ export default function SettingsPage() {
     setActiveRaw(id);
     try { localStorage.setItem("gw-settings-active", id); } catch {}
   };
-  const [isSuper, setIsSuper] = useState(false);
+  // 当前登录用户的权限（来自 /api/auth/me，按账号同步，刷新/重登不丢失）
+  const user = useAuthStore((s) => s.user);
+  const isSuper = user?.role === "super_admin";
+  const perms = user?.permissions || [];
   const current = SETTINGS_MENUS.find((m) => m.id === active) ?? SETTINGS_MENUS[0];
 
   // 恢复上次选中的 tab
@@ -49,19 +55,21 @@ export default function SettingsPage() {
     } catch {}
   }, []);
 
-  // 超管探测：拉取爬虫列表，200 → 是超管；401/403 → 普通用户（不显示入口）
-  useEffect(() => {
-    fetch("/api/admin/crawler/list")
-      .then((r) => setIsSuper(r.ok))
-      .catch(() => setIsSuper(false));
-  }, []);
+  // 菜单可见性：超管可见全部；爬虫配置额外对 crawler_manage 权限开放；
+  // 用户权限管理仅超管可见（仅超管可授权）。
+  const isMenuVisible = (m: SettingsMenu) => {
+    if (m.id === "crawler") return isSuper || perms.includes("crawler_manage");
+    if (m.requiredSuper) return isSuper;
+    return true;
+  };
+  const visibleMenus = SETTINGS_MENUS.filter(isMenuVisible);
 
   return (
     <DashboardLayout title="系统设置">
       <div className="max-w-6xl mx-auto">
         {/* 移动端：顶部可滑动二级分类菜单（参考「一键初稿」二级导航） */}
         <div className="md:hidden flex items-center gap-1 px-4 py-2 border-b border-sidebar-border bg-white overflow-x-auto sticky top-0 z-20">
-          {SETTINGS_MENUS.filter((m) => !m.requiredSuper || isSuper).map((m) => {
+          {visibleMenus.map((m) => {
             const Icon = m.icon;
             const on = active === m.id;
             return (
@@ -85,7 +93,7 @@ export default function SettingsPage() {
               <span>设置项</span>
             </div>
             <nav className="space-y-1">
-              {SETTINGS_MENUS.filter((m) => !m.requiredSuper || isSuper).map((m) => {
+              {visibleMenus.map((m) => {
                 const Icon = m.icon;
                 const on = active === m.id;
                 return (
@@ -104,8 +112,8 @@ export default function SettingsPage() {
                   </button>
                 );
               })}
-              {!isSuper && (
-                <p className="text-[10px] text-gray-300 px-3 pt-2">爬虫配置为超级管理员专属功能</p>
+              {!isSuper && !perms.includes("crawler_manage") && (
+                <p className="text-[10px] text-gray-300 px-3 pt-2">部分功能需相应权限，由超级管理员分配</p>
               )}
             </nav>
           </aside>
@@ -117,6 +125,7 @@ export default function SettingsPage() {
             {active === "reviewer" && <ReviewerPanel />}
             {active === "crawler" && <CrawlerAdminPanel />}
             {active === "users" && <UserAdminPanel />}
+            {active === "memory" && <AiMemoryPanel />}
 
             {!current.ready && (
               <div className="text-center py-20 bg-gray-50 rounded-xl border border-dashed border-gray-200">

@@ -7,6 +7,7 @@ import { db, client } from "@/server/db";
 import { apiKeys } from "@/server/db/schema";
 import { getServerUser } from "@/server/auth/guard";
 import { isSuperAdmin } from "@/server/auth/super-admin";
+import { hasPermission } from "@/server/auth/permission";
 import { eq, desc } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { encryptApiKey, decryptApiKey, maskApiKey } from "@/server/lib/crypto";
@@ -81,7 +82,8 @@ export async function GET() {
     });
 
     const systemMiniCPM = await ensureSystemMiniCPMConfig();
-    const isSuper = await isSuperAdmin(user.id);
+    // 可管理系统级配置：超级管理员 或 拥有 api_config 权限
+    const isSuper = (await isSuperAdmin(user.id)) || (await hasPermission(user.id, "api_config"));
 
     return NextResponse.json({
       success: true,
@@ -148,12 +150,12 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ success: false, error: { message: "缺少 ID" } }, { status: 400 });
     }
 
-    const isSuper = await isSuperAdmin(user.id);
+    const isSuper = (await isSuperAdmin(user.id)) || (await hasPermission(user.id, "api_config"));
 
     // 系统默认 MiniCPM
     if (id === "system:minicpm") {
       if (!isSuper) {
-        return NextResponse.json({ success: false, error: { message: "无权限：仅超级管理员可修改系统默认配置" } }, { status: 403 });
+        return NextResponse.json({ success: false, error: { message: "无权限：仅超级管理员或拥有「API配置管理」权限可修改系统默认配置" } }, { status: 403 });
       }
       const cfg = await ensureSystemMiniCPMConfig();
       if (typeof apiKey === "string" && apiKey.trim()) {
@@ -239,11 +241,11 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, error: { message: "缺少 ID" } }, { status: 400 });
     }
 
-    const isSuper = await isSuperAdmin(user.id);
+    const isSuper = (await isSuperAdmin(user.id)) || (await hasPermission(user.id, "api_config"));
 
     if (id === "system:minicpm") {
       if (!isSuper) {
-        return NextResponse.json({ success: false, error: { message: "无权限：仅超级管理员可删除系统默认配置" } }, { status: 403 });
+        return NextResponse.json({ success: false, error: { message: "无权限：仅超级管理员或拥有「API配置管理」权限可删除系统默认配置" } }, { status: 403 });
       }
       await deleteSystemMiniCPMConfig();
       return NextResponse.json({ success: true });

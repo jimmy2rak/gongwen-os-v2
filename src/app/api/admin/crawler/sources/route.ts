@@ -5,14 +5,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { client } from "@/server/db";
 import { getServerUser } from "@/server/auth/guard";
-import { isSuperAdmin } from "@/server/auth/super-admin";
+import { hasPermission } from "@/server/auth/permission";
 import { nanoid } from "nanoid";
 
 // ── 新增数据源 ──
 export async function POST(req: NextRequest) {
   const user = await getServerUser();
   if (!user) return NextResponse.json({ success: false, error: { message: "未登录" } }, { status: 401 });
-  if (!(await isSuperAdmin(user.id))) {
+  if (!(await hasPermission(user.id, "crawler_manage"))) {
     return NextResponse.json({ success: false, error: { message: "无权限" } }, { status: 403 });
   }
 
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const user = await getServerUser();
   if (!user) return NextResponse.json({ success: false, error: { message: "未登录" } }, { status: 401 });
-  if (!(await isSuperAdmin(user.id))) {
+  if (!(await hasPermission(user.id, "crawler_manage"))) {
     return NextResponse.json({ success: false, error: { message: "无权限" } }, { status: 403 });
   }
 
@@ -84,7 +84,7 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const user = await getServerUser();
   if (!user) return NextResponse.json({ success: false, error: { message: "未登录" } }, { status: 401 });
-  if (!(await isSuperAdmin(user.id))) {
+  if (!(await hasPermission(user.id, "crawler_manage"))) {
     return NextResponse.json({ success: false, error: { message: "无权限" } }, { status: 403 });
   }
 

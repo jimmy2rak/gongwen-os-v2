@@ -118,6 +118,14 @@ export function DocEditor({
   // 选区变化监听（同时回传选区视口坐标，供 AI 浮条定位）
   useEffect(() => {
     if (!editor || !onSelectionChange) return;
+    // 失焦保护：焦点移到 Chatbox 时编辑器选区会被浏览器折叠并触发 selectionUpdate，
+    // 此时不应清空已选文本，以便用户能在右侧手动输入指令作用于选中内容。
+    const blurringRef = { current: false };
+    const onBlur = () => {
+      blurringRef.current = true;
+      // 当前事件循环结束后再解除（涵盖 blur 引起的折叠 selectionUpdate）
+      setTimeout(() => { blurringRef.current = false; }, 0);
+    };
     const handleSelection = () => {
       const { from, to } = editor.state.selection;
       if (from !== to) {
@@ -127,12 +135,17 @@ export function DocEditor({
           rect = { top: c.top, left: c.left, bottom: c.bottom, right: c.right };
         } catch {}
         onSelectionChange({ text: editor.state.doc.textBetween(from, to, " "), rect });
-      } else {
+      } else if (!blurringRef.current) {
+        // 仅在编辑器内主动折叠选区（非失焦）时清空
         onSelectionChange({ text: "", rect: null });
       }
     };
     editor.on("selectionUpdate", handleSelection);
-    return () => { editor.off("selectionUpdate", handleSelection); };
+    editor.on("blur", onBlur);
+    return () => {
+      editor.off("selectionUpdate", handleSelection);
+      editor.off("blur", onBlur);
+    };
   }, [editor, onSelectionChange]);
 
   if (!editor) {

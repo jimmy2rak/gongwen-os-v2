@@ -10,6 +10,8 @@ export interface User {
   email: string;
   name: string | null;
   avatar?: string | null;
+  role?: string;            // user / admin / super_admin
+  permissions?: string[];   // 细粒度权限码（超管为全部）
 }
 
 interface AuthState {

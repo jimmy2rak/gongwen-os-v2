@@ -11,7 +11,7 @@ import { useEditorStore } from "@/stores/editor.store";
 import { buildSelectionInstruction, ChatMessage } from "@/server/lib/ai/prompts";
 import { buildGlobalContext } from "@/lib/ai/context";
 import { getGlobalSkills } from "@/lib/global-skill-store";
-import { Sparkles, Send, Copy, CornerDownLeft, Replace, X, RefreshCw, AlertCircle, Settings, ChevronDown, ChevronRight, Check } from "lucide-react";
+import { Sparkles, Send, Copy, CornerDownLeft, Replace, X, RefreshCw, AlertCircle, Settings, ChevronDown, ChevronRight, Check, Quote } from "lucide-react";
 
 interface ModelOption {
   provider: string;
@@ -23,6 +23,8 @@ interface ModelOption {
 export function AiAssistant({ editor }: { editor: Editor | null }) {
   const selectedText = useEditorStore((s) => s.selectedText);
   const selectionRect = useEditorStore((s) => s.selectionRect);
+  const setSelectedText = useEditorStore((s) => s.setSelectedText);
+  const setSelectionRect = useEditorStore((s) => s.setSelectionRect);
   const currentCategory = useEditorStore((s) => s.category); // 当前公文类型
 
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
@@ -275,6 +277,12 @@ export function AiAssistant({ editor }: { editor: Editor | null }) {
     }
   };
 
+  // 清除已选文本（焦点移到 Chatbox 后仍保留，用户可手动取消）
+  const clearSelection = () => {
+    setSelectedText("");
+    setSelectionRect(null);
+  };
+
   const cancel = () => abortRef.current?.abort();
 
   const insertAtCursor = () => {
@@ -473,6 +481,18 @@ export function AiAssistant({ editor }: { editor: Editor | null }) {
 
       {/* 输入区 */}
       <div className="px-3 py-2 border-t border-gray-200">
+        {/* 已选文本指示条：焦点移到 Chatbox 时仍保留，可一键清除 */}
+        {selectedText && (
+          <div className="flex items-center gap-1.5 px-2 py-1.5 mb-2 rounded-lg bg-[#163f3a]/8 border border-[#163f3a]/15">
+            <Quote className="w-3.5 h-3.5 text-[#163f3a] flex-shrink-0" />
+            <span className="text-[11px] text-gray-600 truncate flex-1">
+              已选 {selectedText.length} 字：{selectedText.slice(0, 36)}{selectedText.length > 36 ? "…" : ""}
+            </span>
+            <button onClick={clearSelection} title="取消选中" className="flex-shrink-0 text-gray-400 hover:text-gray-600">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
         <div className="flex items-end gap-2">
           <textarea
             value={input}
