@@ -23,9 +23,10 @@ export async function GET() {
   let avatar: string | null = null;
   let name = user.name;
   let role = "user";
+  let phone: string | null = null;
   try {
     const rows = await db
-      .select({ avatar: users.avatar, name: users.name, role: users.role })
+      .select({ avatar: users.avatar, name: users.name, role: users.role, phone: users.phone })
       .from(users)
       .where(eq(users.id, user.id))
       .limit(1);
@@ -33,6 +34,7 @@ export async function GET() {
       avatar = rows[0].avatar ?? null;
       name = rows[0].name ?? user.name;
       role = rows[0].role ?? "user";
+      phone = rows[0].phone ?? null;
     }
   } catch {
     // 忽略：头像查询失败不影响登录态
@@ -53,6 +55,7 @@ export async function GET() {
       email: user.email,
       name,
       avatar,
+      phone,
       role,
       permissions,
     },

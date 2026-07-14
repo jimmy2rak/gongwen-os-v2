@@ -442,7 +442,7 @@ export default function HomePage() {
   const headerTitle = store.title?.trim() || store.category;
   const headerButtons = (
     <>
-      <div className="flex items-center min-w-0 max-w-[160px]">
+      <div className="flex items-center min-w-0 max-w-[220px]">
         <input
           type="text"
           value={store.title}

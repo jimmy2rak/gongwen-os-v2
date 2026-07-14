@@ -81,9 +81,8 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
 
   const goProfile = () => {
     setMenuOpen(false);
-    // 打开设置页并定位到「用户画像」标签
-    try { localStorage.setItem("gw-settings-active", "profile"); } catch {}
-    router.push("/settings");
+    // 跳转到真实可用的「账户资料」修改页（昵称/邮箱/密码等）
+    router.push("/account");
   };
 
   const displayName = user?.name || user?.email || "未登录";

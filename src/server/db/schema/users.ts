@@ -8,6 +8,7 @@ export const users = sqliteTable("users", {
   password: text("password"),                            // bcrypt 哈希后的密码（OAuth 用户可为 null）
   name: text("name"),                                    // 显示名称
   avatar: text("avatar"),                                // 头像 URL
+  phone: text("phone"),                                  // 手机号（可选）
   emailVerified: integer("email_verified", { mode: "timestamp" }), // 邮箱验证时间，null = 未验证
   preferredTemplateId: text("preferred_template_id"),
   role: text("role").notNull().default("user"),          // user / admin / super_admin

@@ -1,5 +1,6 @@
-// ─── 统一认证页面（密码登录 / 注册 / 验证码登录 / 找回密码） ─────
-// 四合一 tab 切换，含验证码登录和 Magic Link
+// ─── 登录 / 注册 / 验证码 / 找回密码 ───────────────
+// 布局：叶子笔 Logo → 介绍文字 → Toggle Group（密码登录 / 验证码链接登录）
+//      → 输入框 → 登录/注册按钮 → 小字提示 + 找回密码 → 底部 GitHub 链接
 
 "use client";
 
@@ -8,16 +9,47 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth.store";
 import { Mail, Lock, User, Key } from "lucide-react";
 
-type AuthTab = "login" | "register" | "code" | "forgot";
+type LoginMode = "password" | "code";
+// 密码模式下的子流程：登录 / 注册 / 找回密码
+type SubFlow = "login" | "register" | "forgot";
+
+// 仓库地址（底部「前往仓库」）
+const REPO_URL = "https://github.com/jimmy2rak/gongwen-os-v2";
+
+// 叶子笔 Logo（叶身 + 中脉笔杆 + 笔尖）
+function LeafPenLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-7 h-7" aria-hidden="true">
+      <path
+        d="M4 20 C 4 11 10 4 19 4 C 19 13 13 20 4 20 Z"
+        fill="white"
+      />
+      <path
+        d="M5.5 18.5 L 14.5 8"
+        stroke="#163f3a"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <path
+        d="M14.5 8 L 20 3"
+        stroke="white"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
 
 function AuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const initialTab = searchParams.get("tab") === "register" ? "register" : "login";
   const redirectTo = searchParams.get("redirect") || "/";
 
-  const [tab, setTab] = useState<AuthTab>(initialTab);
+  const [mode, setMode] = useState<LoginMode>("password");
+  const [sub, setSub] = useState<SubFlow>("login");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -41,8 +73,8 @@ function AuthContent() {
   // 找回密码
   const [resetEmail, setResetEmail] = useState("");
 
-  // 清理
-  useEffect(() => { setError(""); setSuccess(""); }, [tab]);
+  // 切换模式/子流程时清理提示
+  useEffect(() => { setError(""); setSuccess(""); }, [mode, sub]);
 
   // 倒计时
   useEffect(() => {
@@ -153,33 +185,34 @@ function AuthContent() {
   const labelClass = "block text-sm font-medium text-gray-700 mb-1";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm px-4 mx-auto">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
+      <div className="w-full max-w-sm mx-auto">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8">
-          {/* Logo */}
+          {/* ── Logo + 介绍文字 ── */}
           <div className="flex flex-col items-center mb-6">
             <div className="w-12 h-12 rounded-xl bg-[#163f3a] flex items-center justify-center mb-3">
-              <span className="text-xl font-bold text-white">公</span>
+              <LeafPenLogo />
             </div>
             <h2 className="text-lg font-semibold text-gray-900">公文 OS</h2>
             <p className="text-sm text-gray-500 mt-0.5">智能公文写作系统</p>
           </div>
 
-          {/* ── Tab 切换 ── */}
-          <div className="flex border border-gray-200 rounded-lg overflow-hidden mb-6">
-            {(["login", "register", "code", "forgot"] as AuthTab[]).map((t, i) => (
+          {/* ── Toggle Group：密码登录 / 验证码·链接登录 ── */}
+          <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
+            {([
+              { k: "password" as LoginMode, label: "密码登录" },
+              { k: "code" as LoginMode, label: "验证码/链接登录" },
+            ]).map((opt) => (
               <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`flex-1 py-2 min-h-[44px] text-xs font-medium transition-colors tab-btn ${
-                  i !== 0 && i !== 3 ? "border-x border-gray-200" : ""
-                } ${
-                  tab === t
-                    ? "bg-[#163f3a] text-white"
-                    : "bg-white text-gray-500 hover:bg-gray-50"
+                key={opt.k}
+                onClick={() => { setMode(opt.k); if (opt.k === "code") setSub("login"); }}
+                className={`flex-1 py-2 min-h-[44px] text-xs font-medium rounded-md transition-colors ${
+                  mode === opt.k
+                    ? "bg-white text-[#163f3a] shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
                 }`}
               >
-                {t === "login" ? "密码登录" : t === "register" ? "注册" : t === "code" ? "验证码" : "找回密码"}
+                {opt.label}
               </button>
             ))}
           </div>
@@ -192,8 +225,8 @@ function AuthContent() {
             <div className="mb-4 p-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-700">{success}</div>
           )}
 
-          {/* ── Tab: 密码登录 ── */}
-          {tab === "login" && (
+          {/* ── 密码登录 ── */}
+          {mode === "password" && sub === "login" && (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className={labelClass}><Mail className="w-3.5 h-3.5 inline mr-1" />邮箱</label>
@@ -208,16 +241,24 @@ function AuthContent() {
               <button type="submit" disabled={loading} className={btnClass}>
                 {loading ? "登录中..." : "登录"}
               </button>
+              <div className="flex items-center justify-between text-xs text-gray-400 pt-1">
+                <button type="button" onClick={() => setSub("register")} className="hover:text-[#163f3a] transition-colors">
+                  还没有账号？去注册
+                </button>
+                <button type="button" onClick={() => setSub("forgot")} className="hover:text-[#163f3a] transition-colors">
+                  找回密码
+                </button>
+              </div>
             </form>
           )}
 
-          {/* ── Tab: 注册 ── */}
-          {tab === "register" && (
+          {/* ── 注册 ── */}
+          {mode === "password" && sub === "register" && (
             <form onSubmit={handleRegister} className="space-y-4">
               <div>
-                <label className={labelClass}><User className="w-3.5 h-3.5 inline mr-1" />姓名</label>
+                <label className={labelClass}><User className="w-3.5 h-3.5 inline mr-1" />昵称</label>
                 <input type="text" value={regName} onChange={(e) => setRegName(e.target.value)}
-                  className={inputClass} placeholder="您的姓名（可选）" />
+                  className={inputClass} placeholder="您的昵称（可选）" />
               </div>
               <div>
                 <label className={labelClass}><Mail className="w-3.5 h-3.5 inline mr-1" />邮箱</label>
@@ -232,11 +273,38 @@ function AuthContent() {
               <button type="submit" disabled={loading} className={btnClass}>
                 {loading ? "注册中..." : "注册"}
               </button>
+              <div className="text-center text-xs text-gray-400 pt-1">
+                <button type="button" onClick={() => setSub("login")} className="hover:text-[#163f3a] transition-colors">
+                  已有账号？返回登录
+                </button>
+              </div>
             </form>
           )}
 
-          {/* ── Tab: 验证码登录 ── */}
-          {tab === "code" && (
+          {/* ── 找回密码 ── */}
+          {mode === "password" && sub === "forgot" && (
+            <form onSubmit={handleForgot} className="space-y-4">
+              <p className="text-xs text-gray-500 leading-relaxed">
+                输入注册时使用的邮箱地址，我们将发送密码重置链接。
+              </p>
+              <div>
+                <label className={labelClass}><Mail className="w-3.5 h-3.5 inline mr-1" />邮箱</label>
+                <input type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)}
+                  className={inputClass} placeholder="your@email.com" required />
+              </div>
+              <button type="submit" disabled={loading} className={btnClass}>
+                {loading ? "发送中..." : "发送重置链接"}
+              </button>
+              <div className="text-center text-xs text-gray-400 pt-1">
+                <button type="button" onClick={() => setSub("login")} className="hover:text-[#163f3a] transition-colors">
+                  返回登录
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ── 验证码 / 链接登录 ── */}
+          {mode === "code" && (
             <form onSubmit={handleCodeLogin} className="space-y-4">
               <div>
                 <label className={labelClass}><Mail className="w-3.5 h-3.5 inline mr-1" />邮箱</label>
@@ -265,23 +333,22 @@ function AuthContent() {
               </p>
             </form>
           )}
+        </div>
 
-          {/* ── Tab: 找回密码 ── */}
-          {tab === "forgot" && (
-            <form onSubmit={handleForgot} className="space-y-4">
-              <p className="text-xs text-gray-500 leading-relaxed">
-                输入注册时使用的邮箱地址，我们将发送密码重置链接。
-              </p>
-              <div>
-                <label className={labelClass}><Mail className="w-3.5 h-3.5 inline mr-1" />邮箱</label>
-                <input type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)}
-                  className={inputClass} placeholder="your@email.com" required />
-              </div>
-              <button type="submit" disabled={loading} className={btnClass}>
-                {loading ? "发送中..." : "发送重置链接"}
-              </button>
-            </form>
-          )}
+        {/* ── 底部：淡色 GitHub 图标 + 前往仓库 ── */}
+        <div className="mt-6 flex items-center justify-center">
+          <a
+            href={REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs text-gray-300 hover:text-gray-500 transition-colors"
+            title="前往 GitHub 仓库"
+          >
+            <svg viewBox="0 0 16 16" className="w-4 h-4 fill-current" fill="currentColor">
+              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+            </svg>
+            <span>前往仓库</span>
+          </a>
         </div>
       </div>
     </div>

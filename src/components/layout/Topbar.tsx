@@ -77,14 +77,16 @@ export function Topbar({
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
       {/* 左侧：菜单按钮 + 标题 + 工具栏插槽 */}
-      <div className="flex items-center gap-3 min-w-0 flex-1">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
         <button
           onClick={onToggleSidebar}
           className="touch-target p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/60 flex-shrink-0"
         >
           <Menu className="w-5 h-5" />
         </button>
-        <h1 className="text-sm font-medium text-sidebar-foreground flex-shrink-0">{title}</h1>
+        {title ? (
+          <h1 className="text-sm font-medium text-sidebar-foreground flex-shrink-0">{title}</h1>
+        ) : null}
         {headerSlot && (
           <div className="flex items-center gap-2 min-w-0 flex-shrink overflow-x-auto md:overflow-visible whitespace-nowrap *:flex-shrink-0">
             {headerSlot}

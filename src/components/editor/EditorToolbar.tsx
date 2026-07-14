@@ -141,7 +141,7 @@ export function EditorToolbar({ editor, onImageUpload }: EditorToolbarProps) {
     },
     {
       items: [
-        { icon: <Pilcrow className="w-4 h-4" />, label: "清除格式", action: () => editor.chain().focus().clearNodes().unsetAllMarks().run() },
+        { icon: <Pilcrow className="w-4 h-4" />, label: "强制渲染", action: () => editor.chain().focus().clearNodes().unsetAllMarks().run(), isActive: false },
       ],
     },
   ];
