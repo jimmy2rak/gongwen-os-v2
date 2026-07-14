@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/stores/auth.store";
+import { proxyImageUrl } from "@/lib/image-proxy";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { User, Mail, Phone, KeyRound, Lock, CheckCircle, AlertTriangle, Image as ImageIcon } from "lucide-react";
 
@@ -17,6 +18,7 @@ export default function AccountPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [avatar, setAvatar] = useState("");
+  const [avatarError, setAvatarError] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -32,6 +34,7 @@ export default function AccountPage() {
       setEmail(user.email ?? "");
       setPhone(user.phone ?? "");
       setAvatar(user.avatar ?? "");
+      setAvatarError(false);
     }
   }, [user]);
 
@@ -113,9 +116,15 @@ export default function AccountPage() {
             <span className={labelClass}><ImageIcon className="w-3.5 h-3.5 inline mr-1" />头像（图片链接）</span>
             <div className="flex items-center gap-3">
               <div className="w-14 h-14 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center flex-shrink-0 border border-gray-200">
-                {avatar ? (
+                {avatar && !avatarError ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={avatar} alt="头像预览" className="w-full h-full object-cover" />
+                  <img
+                    src={proxyImageUrl(avatar)}
+                    alt="头像预览"
+                    referrerPolicy="no-referrer"
+                    onError={() => setAvatarError(true)}
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
                   <span className="text-gray-400 text-lg">
                     {(name || email || "?").trim().charAt(0).toUpperCase()}
@@ -125,7 +134,7 @@ export default function AccountPage() {
               <input
                 type="text"
                 value={avatar}
-                onChange={(e) => setAvatar(e.target.value)}
+                onChange={(e) => { setAvatar(e.target.value); setAvatarError(false); }}
                 placeholder="https://... 留空则使用首字母头像"
                 className={`${inputClass} flex-1`}
               />

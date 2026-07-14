@@ -15,66 +15,33 @@ import {
 
 const now = () => Math.floor(Date.now() / 1000);
 
-// ── 自动 Seed：确保该用户的内置 Skill 已存在 ──
-async function seedBuiltinSkills(userId: string): Promise<void> {
-  const allBuiltins = getAllBuiltinSkills();
-
-  for (const { category, skill: def } of allBuiltins) {
-    // 检查是否已存在同名内置 skill
-    const existing = await db
-      .select()
-      .from(skills)
-      .where(
-        and(
-          eq(skills.userId, userId),
-          eq(skills.category, category),
-          eq(skills.name, def.name),
-          eq(skills.isBuiltin, true)
-        )
-      )
-      .limit(1);
-
-    if (existing.length > 0) continue; // 已存在则跳过
-
-    // 插入内置 skill
-    await client.execute({
-      sql: `INSERT INTO skills (id, user_id, category, name, content, is_builtin, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        `skbuiltin-${category}-${def.name.slice(0, 6)}`,
-        userId,
-        category,
-        def.name,
-        def.content,
-        1, // isBuiltin = true
-        now(),
-        now(),
-      ],
-    });
-  }
-}
-
 // ─── GET 列表 ───────────────────────────────
 // query.category?: string — 按公文类型过滤
+// 内置 Skill 统一从代码 getAllBuiltinSkills() 返回，保证所有账号完全一致（不再逐账号 seed，
+// 避免代码更新后只有先查询过 /api/skills 的账号拿到新版，造成账号间不同步）。
 export async function GET(req: NextRequest) {
   const user = await getServerUser();
   if (!user) {
     return NextResponse.json({ success: false, error: { message: "未登录" } }, { status: 401 });
   }
 
-  // 自动 seed 内置 skill
-  try {
-    await seedBuiltinSkills(user.id);
-  } catch (e) {
-    console.error("[skills] seed error:", e);
-    // seed 失败不阻断查询，仅记录日志
-  }
-
   const url = new URL(req.url);
   const catFilter = url.searchParams.get("category") || undefined;
 
   try {
-    let conditions = [eq(skills.userId, user.id)];
+    // 1) 内置 Skill：全局统一（所有账号看到的完全一致）
+    const builtins = getAllBuiltinSkills().map(({ category, skill }, idx) => ({
+      id: `blt-${category}-${idx}`,
+      category,
+      name: skill.name,
+      content: skill.content,
+      isBuiltin: true,
+      createdAt: null,
+      updatedAt: null,
+    }));
+
+    // 2) 用户自定义 Skill（仅本账号、且非内置）
+    const conditions = [eq(skills.userId, user.id), eq(skills.isBuiltin, false)];
     if (catFilter) {
       conditions.push(eq(skills.category, catFilter));
     }
@@ -85,17 +52,20 @@ export async function GET(req: NextRequest) {
       .where(and(...conditions))
       .orderBy(desc(skills.createdAt));
 
+    const custom = rows.map((r) => ({
+      id: r.id,
+      category: r.category,
+      name: r.name,
+      content: r.content,
+      isBuiltin: Boolean(r.isBuiltin),
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    }));
+
     return NextResponse.json({
       success: true,
-      data: rows.map((r) => ({
-        id: r.id,
-        category: r.category,
-        name: r.name,
-        content: r.content,
-        isBuiltin: Boolean(r.isBuiltin),
-        createdAt: r.createdAt,
-        updatedAt: r.updatedAt,
-      })),
+      data: [...builtins, ...custom],
+      builtinSynced: true,
     });
   } catch (error) {
     console.error("[skills GET] Error:", error);

@@ -23,6 +23,7 @@ import {
   UserCog,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
+import { proxyImageUrl } from "@/lib/image-proxy";
 
 // 构建时自动注入的版本号（见 scripts/gen-version.mjs）
 import { APP_VERSION } from "../../lib/version";
@@ -44,8 +45,18 @@ const navItems = [
 ];
 
 function UserAvatar({ src, name, email }: { src?: string | null; name?: string | null; email?: string | null }) {
-  if (src) {
-    return <img src={src} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />;
+  const [failed, setFailed] = useState(false);
+  if (src && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={proxyImageUrl(src)}
+        alt=""
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
+        className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+      />
+    );
   }
   const initial = (name || email || "?").trim().charAt(0).toUpperCase();
   return (
