@@ -4,7 +4,6 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
 import { ExportMenu } from "@/components/editor/ExportMenu";
 import { useAuthStore } from "@/stores/auth.store";
 import { useEditorStore, DEFAULT_META } from "@/stores/editor.store";
@@ -29,8 +28,8 @@ import { HistoryModal } from "@/components/editor/HistoryModal";
 const HEADER_BUTTON_CLASS = "flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg transition-colors flex-shrink-0";
 
 export default function HomePage() {
-  const { user, isLoading, loadError, fetchUser } = useAuthStore();
-  const router = useRouter();
+  // 鉴权由 (dashboard)/layout 统一处理，本页只读取已登录用户
+  const user = useAuthStore((s) => s.user);
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
   const [customTemplates, setCustomTemplates] = useState<Record<string, string>>({});
   const [showReviewDialog, setShowReviewDialog] = useState(false);
@@ -62,22 +61,6 @@ export default function HomePage() {
   const allCats = getAllCategories();
   const editorRef = useRef<Editor | null>(null);
   const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
-  const fetched = useRef(false);
-
-  // 页面加载时获取用户（只执行一次）
-  useEffect(() => {
-    if (!fetched.current) {
-      fetched.current = true;
-      fetchUser();
-    }
-  }, [fetchUser]);
-
-  // 未登录跳转（用 useEffect 避免渲染时更新 Router）
-  useEffect(() => {
-    if (!isLoading && !user && !loadError) {
-      router.replace("/login");
-    }
-  }, [user, isLoading, loadError, router]);
 
   // ─── 自动保存草稿到 localStorage（每 30 秒） ──
   useEffect(() => {
@@ -282,31 +265,6 @@ export default function HomePage() {
       })
       .catch(() => {});
   }, [store.showNewDocDialog]);
-
-  // 加载中
-  if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center text-sm text-gray-400">加载中...</div>;
-  }
-
-  // 网络/超时加载失败：展示「重试」
-  if (loadError) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4 px-6">
-        <div className="text-sm text-gray-500">加载失败，可能是网络波动或服务启动中</div>
-        <button
-          onClick={() => fetchUser()}
-          className="px-4 py-2 text-sm bg-[#163f3a] text-white rounded-lg hover:bg-[#0f2e2a]"
-        >
-          点击重试
-        </button>
-      </div>
-    );
-  }
-
-  // 未登录
-  if (!user) {
-    return <div className="min-h-screen flex items-center justify-center text-sm text-gray-400">加载中...</div>;
-  }
 
   // ─── 新建文档 ──────────────────────────────────
   const handleNewDoc = async (cat: string) => {
