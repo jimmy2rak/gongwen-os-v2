@@ -4,9 +4,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db, client } from "@/server/db";
-import { documents, reviews, users } from "@/server/db/schema";
+import { documents, reviews } from "@/server/db/schema";
 import { getServerUser } from "@/server/auth/guard";
-import { eq, desc, like, and, isNull, sql, isNotNull } from "drizzle-orm";
+import { eq, desc, like, and, isNull, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
 // ─── GET 文档列表 ───────────────────────────────
@@ -74,11 +74,10 @@ export async function GET(req: NextRequest) {
         reviewed: documents.reviewed,
         reviewerId: documents.reviewerId,
         reviewerName: sql<string>`COALESCE(
-          (SELECT u.name
+          (SELECT r.reviewer_name
            FROM reviews r
-           LEFT JOIN users u ON r.reviewer_id = u.id
            WHERE r.document_id = documents.id
-             AND r.status = 'approved'
+             AND r.review_status = 'approved'
            ORDER BY r.created_at DESC
            LIMIT 1),
           ''
