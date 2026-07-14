@@ -20,6 +20,13 @@ export interface ServerUser {
  *   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
  */
 export async function getServerUser(): Promise<ServerUser | null> {
+  // 诊断：JWT_SECRET 缺失时所有请求都会被视为未登录（表现为 dashboard 卡「加载中」）
+  if (!process.env.JWT_SECRET) {
+    console.error(
+      "[auth:getServerUser] JWT_SECRET 环境变量缺失！/api/auth/me 会一直返回未登录。" +
+        "请到 Vercel 项目 Settings → Environment Variables 为 Production 配置 JWT_SECRET 后重新部署。"
+    );
+  }
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get("auth_token")?.value;
