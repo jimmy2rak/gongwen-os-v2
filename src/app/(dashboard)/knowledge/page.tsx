@@ -4,7 +4,8 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useAuthStore } from "@/stores/auth.store";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PreviewModal } from "@/components/editor/PreviewModal";
 import { ExportMenu } from "@/components/editor/ExportMenu";
@@ -18,6 +19,7 @@ import {
 import { KnowledgeChat } from "@/components/ai/KnowledgeChat";
 import { getAllCategories, getCategoryColor } from "@/types";
 import { cachedFetch, invalidateCache } from "@/lib/cache";
+import { getCachedData, writePreload, invalidatePreload } from "@/lib/preload-cache";
 
 interface KnowledgeDoc {
   id: string;
@@ -32,6 +34,7 @@ interface KnowledgeDoc {
 }
 
 export default function KnowledgePage() {
+  const userId = useAuthStore((s) => s.user?.id);
   const [docs, setDocs] = useState<KnowledgeDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCat, setActiveCat] = useState<string>("");
@@ -48,8 +51,19 @@ export default function KnowledgePage() {
     setTimeout(() => setToast(null), 2500);
   };
 
+  const lastDocsKey = useRef("knowledge::");
+  const bumpPreload = () => invalidatePreload(userId, lastDocsKey.current);
+
   const loadDocs = () => {
-    setLoading(true);
+    const key = `knowledge:${activeCat}:${search}`;
+    lastDocsKey.current = key;
+    const cached = getCachedData<{ data: KnowledgeDoc[] }>(userId, key);
+    if (cached?.data?.length) {
+      setDocs(cached.data);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     const params = new URLSearchParams({ reviewed: "true", pageSize: "100" });
     if (activeCat) params.set("category", activeCat);
     if (search) params.set("search", search);
@@ -61,7 +75,9 @@ export default function KnowledgePage() {
     )
       .then((b) => {
         if (b.success) {
-          setDocs(b.data?.items || b.data || []);
+          const list = b.data?.items || b.data || [];
+          setDocs(list);
+          writePreload(userId, key, { success: true, data: list });
         }
         setLoading(false);
       })
@@ -86,6 +102,7 @@ export default function KnowledgePage() {
       if (b.success) {
         setDocs((prev) => prev.filter((d) => d.id !== docId));
         invalidateCache("knowledge:");
+        bumpPreload();
         showToast("success", `已驳回审阅：「${title}」`);
       } else {
         showToast("error", "操作失败");
@@ -119,6 +136,7 @@ export default function KnowledgePage() {
       if (b.success) {
         setShowDocxImport(false);
         invalidateCache("knowledge:");
+        bumpPreload();
         loadDocs();
         showToast("success", `「${data.title}」已导入并标记为已审阅`);
       } else {

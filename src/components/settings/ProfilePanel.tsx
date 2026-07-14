@@ -1,29 +1,21 @@
-// ─── 画像设置面板 ───────────────────────────────
-// 管理默认画像（姓名/单位/级别/类型），存 localStorage（gw-profiles）。
-// 默认画像会被注入所有 AI 调用的 system prompt。
+// ─── 画像设置面板（按账号隔离，数据库为真相来源）─────────
+// 管理默认画像（姓名/单位/级别/类型）。数据存 user_profiles 表（按 user_id 隔离），
+// 写操作后同步更新预加载缓存，保证 AI 等同步场景读到的也是当前账号的画像。
 
 "use client";
 
 import { useEffect, useState } from "react";
 import { Plus, Star, Trash2, Pencil, Check, X } from "lucide-react";
 import { CustomDialog } from "@/components/ui/CustomDialog";
-import {
-  getProfiles,
-  getDefaultProfile,
-  saveProfile,
-  deleteProfile,
-  setDefaultProfile,
-  type Profile,
-} from "@/lib/profile-store";
+import { useAuthStore } from "@/stores/auth.store";
+import { writePreload } from "@/lib/preload-cache";
+import { migrateLocalProfilesToServer, type Profile } from "@/lib/profile-store";
 
 const LEVELS = ["省级", "市级", "区级", "乡镇级"];
 const TYPES = ["机关", "事业单位", "国企", "民企", "学校", "医院", "银行", "律所", "基层单位", "其他"];
 
-function uid() {
-  return "pf" + Math.random().toString(36).slice(2, 10);
-}
-
 export default function ProfilePanel() {
+  const userId = useAuthStore((s) => s.user?.id);
   const [list, setList] = useState<Profile[]>([]);
   const [editing, setEditing] = useState<Profile | null>(null);
   const [form, setForm] = useState<Profile>({
@@ -35,15 +27,33 @@ export default function ProfilePanel() {
   });
   const [showForm, setShowForm] = useState(false);
   const [confirmDel, setConfirmDel] = useState<{ id: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadProfiles = async () => {
+    if (!userId) return;
+    try {
+      const res = await fetch("/api/profiles", { credentials: "include" });
+      const body = await res.json();
+      if (body.success && Array.isArray(body.data)) {
+        const data = body.data as Profile[];
+        setList(data);
+        // 同步预加载缓存，供 AI 等同步场景读取
+        writePreload(userId, "profiles", { success: true, data });
+      }
+    } catch {
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setList(getProfiles());
-  }, []);
-
-  const refresh = () => setList(getProfiles());
+    // 一次性迁移旧版 localStorage 画像到服务端（按账号入库）
+    migrateLocalProfilesToServer().finally(() => loadProfiles());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   const openNew = () => {
-    setForm({ id: uid(), name: "", unit: "", level: LEVELS[1], type: TYPES[0] });
+    setForm({ id: "", name: "", unit: "", level: LEVELS[1], type: TYPES[0] });
     setEditing(null);
     setShowForm(true);
   };
@@ -54,30 +64,69 @@ export default function ProfilePanel() {
     setShowForm(true);
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!form.name.trim()) return;
-    saveProfile({ ...form, name: form.name.trim(), unit: form.unit.trim() });
-    refresh();
-    setShowForm(false);
+    const payload = {
+      name: form.name.trim(),
+      unit: form.unit.trim(),
+      level: form.level,
+      type: form.type,
+      isDefault: !!form.isDefault,
+    };
+    try {
+      if (editing) {
+        await fetch("/api/profiles", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ id: editing.id, ...payload }),
+        });
+      } else {
+        await fetch("/api/profiles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(payload),
+        });
+      }
+      setShowForm(false);
+      await loadProfiles();
+    } catch {
+    }
   };
 
-  const remove = (id: string) => {
-    setConfirmDel({ id });
+  const remove = async (id: string) => {
+    try {
+      await fetch(`/api/profiles?id=${encodeURIComponent(id)}`, { method: "DELETE", credentials: "include" });
+      setConfirmDel(null);
+      await loadProfiles();
+    } catch {
+    }
   };
 
-  const setDefault = (id: string) => {
-    setDefaultProfile(id);
-    refresh();
+  const setDefault = async (id: string) => {
+    const target = list.find((p) => p.id === id);
+    if (!target) return;
+    try {
+      await fetch("/api/profiles", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ id, name: target.name, unit: target.unit, level: target.level, type: target.type, isDefault: true }),
+      });
+      await loadProfiles();
+    } catch {
+    }
   };
 
-  const def = getDefaultProfile();
+  const def = list.find((p) => p.isDefault) || list[0] || null;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-sm font-medium text-gray-800">用户画像</h3>
-          <p className="text-xs text-gray-400 mt-0.5">当前默认画像将作为身份背景注入 AI 公文生成与对话</p>
+          <p className="text-xs text-gray-400 mt-0.5">当前默认画像将作为身份背景注入 AI 公文生成与对话（按账号独立保存）</p>
         </div>
         <button
           onClick={openNew}
@@ -87,7 +136,7 @@ export default function ProfilePanel() {
         </button>
       </div>
 
-      {list.length === 0 && !showForm && (
+      {list.length === 0 && !showForm && !loading && (
         <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-200">
           <p className="text-xs text-gray-400">尚未配置画像，点击右上角新建</p>
         </div>
@@ -198,6 +247,14 @@ export default function ProfilePanel() {
               </select>
             </label>
           </div>
+          <label className="flex items-center gap-2 mt-4">
+            <input
+              type="checkbox"
+              checked={!!form.isDefault}
+              onChange={(e) => setForm({ ...form, isDefault: e.target.checked })}
+            />
+            <span className="text-xs text-gray-600">设为默认画像</span>
+          </label>
           <div className="flex justify-end gap-2 mt-5">
             <button
               onClick={() => setShowForm(false)}
@@ -224,13 +281,7 @@ export default function ProfilePanel() {
         message="确定删除该画像？删除后无法恢复。"
         confirmText="确定删除"
         cancelText="取消"
-        onConfirm={() => {
-          if (confirmDel) {
-            deleteProfile(confirmDel.id);
-            refresh();
-            setConfirmDel(null);
-          }
-        }}
+        onConfirm={() => { if (confirmDel) remove(confirmDel.id); }}
         onCancel={() => setConfirmDel(null)}
       />
     </div>

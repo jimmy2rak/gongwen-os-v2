@@ -7,6 +7,8 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash2, Pencil, X, UserCheck, Building2, Users, AlertTriangle } from "lucide-react";
 import { CustomDialog } from "@/components/ui/CustomDialog";
+import { useAuthStore } from "@/stores/auth.store";
+import { getCachedData, writePreload } from "@/lib/preload-cache";
 
 interface Reviewer {
   id: string;
@@ -24,11 +26,14 @@ const DEFAULT_REVIEWERS: Reviewer[] = [
 function uid() { return "rv" + Math.random().toString(36).slice(2, 10); }
 
 // 从服务端读取审阅人（与编辑器/文档管理共用同一数据源）
-async function loadReviewers(): Promise<Reviewer[]> {
+async function loadReviewers(userId?: string): Promise<Reviewer[]> {
   try {
     const res = await fetch("/api/reviewers");
     const body = await res.json();
-    if (body.success && Array.isArray(body.data)) return body.data;
+    if (body.success && Array.isArray(body.data)) {
+      if (userId) writePreload(userId, "reviewers", body); // 写入预加载缓存
+      return body.data;
+    }
   } catch {}
   return DEFAULT_REVIEWERS;
 }
@@ -75,7 +80,11 @@ export default function ReviewerPanel() {
   } | null>(null);
 
   useEffect(() => {
-    loadReviewers().then(setList);
+    const userId = useAuthStore.getState().user?.id;
+    // 先读本地预加载缓存，秒开
+    const cached = getCachedData<{ success: boolean; data: Reviewer[] }>(userId, "reviewers");
+    if (cached?.data?.length) setList(cached.data);
+    loadReviewers(userId).then(setList);
   }, []);
 
   // 重新读取最新列表

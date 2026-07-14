@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toggleFavorite } from "@/lib/favorite-store";
+import { useAuthStore } from "@/stores/auth.store";
+import { getCachedData, writePreload } from "@/lib/preload-cache";
 
 interface CacheItem { data: any; fetchedAt: number; }
 const _cache = new Map<string, CacheItem>();
@@ -62,11 +64,25 @@ export default function HotArticlesPage() {
   };
 
   const loadData = (skipCache = false) => {
-    setLoading(true);
+    const userId = useAuthStore.getState().user?.id;
+    // 先读本地预加载缓存，秒开
+    const cached = getCachedData<{ data: HotArticleItem[] }>(userId, "hotspots");
+    if (cached?.data?.length) {
+      setItems(cached.data);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     const fetchFn = () => fetch("/api/hot-articles").then((r) => r.json());
     const promise = skipCache ? fetchFn() : cachedFetch("/api/hot-articles", fetchFn);
     promise
-      .then((b) => { if (mounted.current && b.success) setItems((b.data as HotArticleItem[]) || []); })
+      .then((b) => {
+        if (mounted.current && b.success) {
+          const list = (b.data as HotArticleItem[]) || [];
+          setItems(list);
+          writePreload(userId, "hotspots", { success: true, data: list });
+        }
+      })
       .catch(() => {})
       .finally(() => { if (mounted.current) setLoading(false); });
   };

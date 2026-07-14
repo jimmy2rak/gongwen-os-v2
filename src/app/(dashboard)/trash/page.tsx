@@ -3,10 +3,11 @@
 
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuthStore } from "@/stores/auth.store";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { CategoryFilterPills } from "@/components/ui/CategoryFilterPills";
+import { getCachedData, writePreload, invalidatePreload } from "@/lib/preload-cache";
 import { getCategoryColor, getAllCategories } from "@/types";
 import {
   Search, FileText, Trash2, RotateCcw, Clock,
@@ -31,6 +32,7 @@ interface TrashItem {
 
 export default function TrashPage() {
   const { user } = useAuthStore();
+  const userId = user?.id;
 
   const [docs, setDocs] = useState<TrashItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,10 +83,22 @@ export default function TrashPage() {
     catch { return 0; }
   };
 
-  // 加载回收站列表（含缓存）
+  // 当前列表缓存键（供变更后失效使用）
+  const lastDocsKey = useRef("trash::");
+  const bumpPreload = () => invalidatePreload(userId, lastDocsKey.current);
+
+  // 加载回收站列表（缓存优先：先秒开，再后台同步）
   const loadDocs = useCallback(async (q: string, cat?: string, skipCache = false) => {
-    setLoading(true);
+    const key = `trash:${q}:${cat || ""}`;
+    lastDocsKey.current = key;
     setError("");
+    const cached = getCachedData<{ data: any[] }>(userId, key);
+    if (cached?.data?.length) {
+      setDocs(cached.data);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
       const params = new URLSearchParams({ deleted: "true", pageSize: "100" });
       if (q) params.set("search", q);
@@ -102,7 +116,9 @@ export default function TrashPage() {
         return;
       }
       if (body.success) {
-        setDocs(body.data || []);
+        const list = body.data || [];
+        setDocs(list);
+        writePreload(userId, key, { success: true, data: list });
       } else {
         setError(body.error?.message || "加载失败");
       }
@@ -111,7 +127,7 @@ export default function TrashPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => { if (user) loadDocs(""); }, [user, loadDocs]);
   useEffect(() => { if (user) { loadDocs(search, catFilter); } }, [catFilter]);
@@ -154,6 +170,7 @@ export default function TrashPage() {
         setDocs((prev) => prev.filter((d) => d.id !== id));
         setSelected((prev) => { const n = new Set(prev); n.delete(id); return n; });
         invalidateCache("trash:");
+        bumpPreload();
         invalidateCache("documents:");
         showToast("success", "恢复成功");
       } else {
@@ -176,6 +193,7 @@ export default function TrashPage() {
         setDocs((prev) => prev.filter((d) => d.id !== id));
         setSelected((prev) => { const n = new Set(prev); n.delete(id); return n; });
         invalidateCache("trash:");
+        bumpPreload();
         showToast("success", "已永久删除");
       } else {
         showToast("error", body.error?.message || "删除失败");
@@ -205,6 +223,7 @@ export default function TrashPage() {
         setSelected(new Set());
         setSelectAll(false);
         invalidateCache("trash:");
+        bumpPreload();
         invalidateCache("documents:");
         showToast("success", `已恢复 ${ids.length} 篇文档`);
       } else {
@@ -234,6 +253,7 @@ export default function TrashPage() {
         setSelected(new Set());
         setSelectAll(false);
         invalidateCache("trash:");
+        bumpPreload();
         showToast("success", `已永久删除 ${ids.length} 篇文档`);
       } else {
         showToast("error", body.error?.message || "批量删除失败");

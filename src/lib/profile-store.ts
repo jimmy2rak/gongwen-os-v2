@@ -1,8 +1,14 @@
-// ─── 用户画像本地存储（localStorage JSON） ─────────
-// 后期上 Supabase 时可直接以 JSON 文本入库，无需改调用方。
-// 与现有 skills 表(DocSkill) 互不干扰，画像独立存储。
+// ─── 用户画像存储 ───────────────────────────────
+// 现在画像以「按账号隔离的数据库记录」为真相来源（见 /api/profiles）。
+// 本模块负责：
+//   1) getProfiles() —— 供 AI 等同步场景读取「当前账号」的画像（优先读预加载缓存，回退旧 localStorage）。
+//   2) 一次性迁移 —— 把旧版全局 localStorage(gw-profiles) 推送到服务端（按账号入库），随后清除旧键。
+// 写操作（增删改）统一走 /api/profiles（见 ProfilePanel），不再写 localStorage。
 
 "use client";
+
+import { readPreload } from "@/lib/preload-cache";
+import { useAuthStore } from "@/stores/auth.store";
 
 export interface Profile {
   id: string;
@@ -13,63 +19,79 @@ export interface Profile {
   isDefault?: boolean;
 }
 
-const KEY = "gw-profiles";
+const LEGACY_KEY = "gw-profiles";
 
-function read(): Profile[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return [];
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr : [];
-  } catch {
-    return [];
-  }
+function currentUserId(): string | undefined {
+  try { return useAuthStore.getState().user?.id; } catch { return undefined; }
 }
 
-function write(list: Profile[]): Profile[] {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(KEY, JSON.stringify(list));
-  }
-  return list;
-}
-
+/** 读取当前账号的画像列表（供 AI 同步使用） */
 export function getProfiles(): Profile[] {
-  return read();
+  const userId = currentUserId();
+  // 优先：预加载缓存中的服务端数据（按账号隔离）
+  const entry = readPreload<{ success: boolean; data?: any[] }>(userId, "profiles");
+  if (entry?.data?.data && Array.isArray(entry.data.data)) {
+    return entry.data.data.map((p: any) => ({
+      id: String(p.id),
+      name: String(p.name || ""),
+      unit: String(p.unit || ""),
+      level: String(p.level || ""),
+      type: String(p.type || ""),
+      isDefault: !!p.isDefault,
+    }));
+  }
+  // 回退：旧版全局 localStorage
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem(LEGACY_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+  }
+  return [];
 }
 
 export function getDefaultProfile(): Profile | null {
-  const list = read();
+  const list = getProfiles();
   return list.find((p) => p.isDefault) || list[0] || null;
 }
 
-/** 新增或更新画像（按 id 幂等）；保存时保证仅一个默认 */
-export function saveProfile(p: Profile): Profile[] {
-  const list = read();
-  const idx = list.findIndex((x) => x.id === p.id);
-  const next: Profile = { ...p };
-  if (next.isDefault) {
-    list.forEach((x) => (x.isDefault = false));
-    next.isDefault = true;
-  }
-  if (idx >= 0) {
-    list[idx] = next;
-  } else {
-    list.push(next);
-    // 第一条自动设为默认
-    if (list.length === 1 && next.isDefault === undefined) next.isDefault = true;
-  }
-  return write(list);
-}
+/**
+ * 一次性迁移：把旧版全局 localStorage 画像推送到服务端（按当前账号入库）。
+ * 仅当旧键存在且服务端该账号尚无画像时执行；成功后清除旧键。幂等。
+ */
+export async function migrateLocalProfilesToServer(): Promise<void> {
+  if (typeof window === "undefined") return;
+  let legacy: Profile[] = [];
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    if (!raw) return;
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr) || arr.length === 0) { localStorage.removeItem(LEGACY_KEY); return; }
+    legacy = arr;
+  } catch { return; }
 
-export function deleteProfile(id: string): Profile[] {
-  let list = read().filter((x) => x.id !== id);
-  // 若删掉的是默认且无其他默认，把第一条设为默认
-  if (!list.some((x) => x.isDefault) && list.length > 0) list[0].isDefault = true;
-  return write(list);
-}
+  const userId = currentUserId();
+  if (!userId) return;
 
-export function setDefaultProfile(id: string): Profile[] {
-  const list = read().map((x) => ({ ...x, isDefault: x.id === id }));
-  return write(list);
+  try {
+    // 若服务端已有画像，则直接清除旧键，避免重复
+    const check = await fetch("/api/profiles", { credentials: "include" });
+    const body = await check.json();
+    if (body.success && Array.isArray(body.data) && body.data.length > 0) {
+      localStorage.removeItem(LEGACY_KEY);
+      return;
+    }
+    // 逐条推送
+    for (const p of legacy) {
+      await fetch("/api/profiles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: p.name, unit: p.unit, level: p.level, type: p.type, isDefault: !!p.isDefault }),
+      });
+    }
+    localStorage.removeItem(LEGACY_KEY);
+  } catch {
+    // 迁移失败不影响使用，下次登录重试
+  }
 }

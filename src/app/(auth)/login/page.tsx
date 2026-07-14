@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth.store";
+import { preloadAll } from "@/lib/preload-cache";
 import { Mail, Lock, User, Key } from "lucide-react";
 
 type LoginMode = "password" | "code";
@@ -97,6 +98,7 @@ function AuthContent() {
       const body = await res.json();
       if (!res.ok) { setError(body.error?.message || "邮箱或密码错误"); return; }
       useAuthStore.getState().setUser(body.data);
+      preloadAll(body.data.id).catch(() => {});
       router.push(redirectTo);
       router.refresh();
     } catch { setError("网络错误，请稍后重试"); }
@@ -116,6 +118,7 @@ function AuthContent() {
       const body = await res.json();
       if (!res.ok) { setError(body.error?.message || "注册失败"); return; }
       useAuthStore.getState().setUser(body.data);
+      preloadAll(body.data.id).catch(() => {});
       router.push("/");
     } catch { setError("网络错误，请稍后重试"); }
     finally { setLoading(false); }
@@ -155,6 +158,7 @@ function AuthContent() {
       const body = await res.json();
       if (!res.ok) { setError(body.error?.message || "验证失败"); return; }
       useAuthStore.getState().setUser(body.data);
+      preloadAll(body.data.id).catch(() => {});
       router.push(redirectTo);
       router.refresh();
     } catch { setError("网络错误，请稍后重试"); }

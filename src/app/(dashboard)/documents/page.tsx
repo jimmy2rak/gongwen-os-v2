@@ -3,7 +3,7 @@
 
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuthStore } from "@/stores/auth.store";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PreviewModal } from "@/components/editor/PreviewModal";
@@ -14,6 +14,7 @@ import { CategoryFilterPills } from "@/components/ui/CategoryFilterPills";
 import { getCategoryColor, getAllCategories, DOCUMENT_CATEGORIES } from "@/types";
 import { getFavoriteIds, isFavorite, toggleFavorite } from "@/lib/favorite-store";
 import { cachedFetch, invalidateCache } from "@/lib/cache";
+import { getCachedData, writePreload, invalidatePreload } from "@/lib/preload-cache";
 import {
   Search, Plus, FileText, Trash2, Edit3, Eye, SendHorizonal,
   Clock, CheckCircle, AlertCircle, X, Filter, ArrowUpDown, Star, FileUp,
@@ -35,6 +36,7 @@ interface DocItem {
 
 export default function DocumentsPage() {
   const { user } = useAuthStore();
+  const userId = user?.id;
 
   const [docs, setDocs] = useState<DocItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,10 +108,23 @@ export default function DocumentsPage() {
     });
   };
 
-  // 加载文档列表（含缓存）
+  // 当前列表缓存键（供变更后失效使用）
+  const lastDocsKey = useRef("documents::");
+  const bumpPreload = () => invalidatePreload(userId, lastDocsKey.current);
+
+  // 加载文档列表（缓存优先：先秒开，再后台同步）
   const loadDocs = useCallback(async (q: string, cat?: string, skipCache = false) => {
-    setLoading(true);
+    const key = `documents:${q}:${cat || ""}`;
+    lastDocsKey.current = key;
     setError("");
+    // 先读本地预加载缓存（信封格式 {success,data}），秒开
+    const cached = getCachedData<{ data: DocItem[] }>(userId, key);
+    if (cached?.data?.length) {
+      setDocs(cached.data);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
       const params = new URLSearchParams({ pageSize: "100" });
       if (q) params.set("search", q);
@@ -133,6 +148,7 @@ export default function DocumentsPage() {
       if (body.success) {
         const list = body.data || [];
         setDocs(list);
+        writePreload(userId, key, { success: true, data: list }); // 信封格式写回，与预加载一致
       } else {
         setError(body.error?.message || "加载失败");
       }
@@ -142,7 +158,7 @@ export default function DocumentsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => { if (user) loadDocs("", catFilter); }, [user, loadDocs, catFilter]);
 
@@ -247,6 +263,7 @@ export default function DocumentsPage() {
       if (b.success) {
         setShowDocxImport(false);
         invalidateCache("documents:");
+        bumpPreload();
         loadDocs(searchInput, catFilter, true);
         showDialog("导入成功", `「${data.title}」已导入到文档库`);
       } else {
@@ -312,6 +329,7 @@ export default function DocumentsPage() {
         setSelected(new Set());
         setSelectAll(false);
         invalidateCache("documents:");
+        bumpPreload();
         if (body.blocked?.length > 0) {
           showDialog("删除结果", `${body.blocked.length} 篇已审阅文档被跳过删除`);
         }
@@ -341,6 +359,7 @@ export default function DocumentsPage() {
       setReviewDocId(null);
       showDialog("审阅完成", approved ? `已审阅 ${ids.length} 篇` : `已驳回`);
       invalidateCache("documents:");
+        bumpPreload();
       loadDocs(search, catFilter, true);
     } catch {
       showDialog("审阅失败", "审阅操作失败，请重试");

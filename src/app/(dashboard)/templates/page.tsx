@@ -37,6 +37,8 @@ import {
 } from "@/lib/builtin-templates";
 import { ContentPreviewModal } from "@/components/ui/ContentPreviewModal";
 import { cachedFetch, invalidateCache } from "@/lib/cache";
+import { useAuthStore } from "@/stores/auth.store";
+import { getCachedData, writePreload, invalidatePreload } from "@/lib/preload-cache";
 
 // ── 类型定义 ──
 
@@ -167,24 +169,33 @@ export default function TemplatesPage() {
     return cc?.color || "#6b7280";
   };
 
-  // ── 数据加载 ──
+  // ── 数据加载（缓存优先：先秒开，再后台同步）──
+  const userId = useAuthStore((s) => s.user?.id);
 
   const loadData = useCallback(async () => {
-    setLoading(true);
+    // 先读本地预加载缓存，秒开
+    const cachedTpl = getCachedData<{ data: { custom?: any[] } }>(userId, "templates");
+    const cachedSkills = getCachedData<{ data: any[] }>(userId, "skills");
+    let seeded = false;
+    if (cachedTpl?.data?.custom?.length) { setAllCustomTpls(cachedTpl.data.custom); seeded = true; }
+    if (cachedSkills?.data?.length) { setAllSkills(cachedSkills.data); seeded = true; }
+    if (seeded) setLoading(false); else setLoading(true);
     try {
       const [tplRes, skillRes] = await Promise.all([
         cachedFetch("templates:list", () => fetch("/api/templates").then((r) => r.json()), 30_000),
         cachedFetch("skills:list", () => fetch("/api/skills").then((r) => r.json()), 30_000),
       ]);
-      if (tplRes.success && tplRes.data?.custom) setAllCustomTpls(tplRes.data.custom);
-      if (skillRes.success) setAllSkills(skillRes.data || []);
+      if (tplRes.success && tplRes.data?.custom) { setAllCustomTpls(tplRes.data.custom); writePreload(userId, "templates", tplRes); }
+      if (skillRes.success) { setAllSkills(skillRes.data || []); writePreload(userId, "skills", skillRes); }
     } catch { /* ignore */ }
     setLoading(false);
-  }, []);
+  }, [userId]);
 
   const refreshData = () => {
     invalidateCache("templates:");
     invalidateCache("skills:");
+    invalidatePreload(userId, "templates");
+    invalidatePreload(userId, "skills");
     loadData();
   };
 

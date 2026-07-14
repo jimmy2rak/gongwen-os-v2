@@ -6,6 +6,8 @@
 import { useState, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import Link from "next/link";
+import { useAuthStore } from "@/stores/auth.store";
+import { getCachedData, writePreload } from "@/lib/preload-cache";
 import {
   FileText, FileSearch, CheckCircle, LayoutTemplate, Sparkles,
   TrendingUp, Clock, ArrowRight, BookOpen, Settings,
@@ -32,6 +34,7 @@ function cachedFetch(key: string, fetcher: () => Promise<any>): Promise<any> {
 }
 
 export default function HomePage() {
+  const userId = useAuthStore((s) => s.user?.id);
   const [stats, setStats] = useState({
     totalDocs: 0, pendingReview: 0, reviewed: 0, templates: 0, skills: 0,
   });
@@ -46,6 +49,12 @@ export default function HomePage() {
 
   useEffect(() => {
     mounted.current = true;
+    // 先读本地预加载缓存（首页数字秒开）
+    const cachedStats = getCachedData<typeof stats>(userId, "home:stats");
+    if (cachedStats) {
+      setStats(cachedStats);
+      setLoading(false);
+    }
     // 拉取当前用户的快捷入口配置（按账号同步）
     fetch("/api/user/preferences").then((r) => r.json()).then((b) => {
       if (mounted.current && b.success && Array.isArray(b.quickEntries) && b.quickEntries.length) {
@@ -68,13 +77,15 @@ export default function HomePage() {
       const allTpls = tplRes.success ? (tplRes.data?.custom || []) : [];
       const allSkills = skillRes.success ? (skillRes.data || []) : [];
 
-      setStats({
+      const nextStats = {
         totalDocs: docTotal,
         pendingReview: pendingDocs.length,
         reviewed: reviewedDocs.length,
         templates: 11 + allTpls.length,
         skills: allSkills.length,
-      });
+      };
+      setStats(nextStats);
+      writePreload(userId, "home:stats", nextStats); // 写入预加载缓存
       setRecentDocs(allDocs.slice(0, 5));
       setLoading(false);
     }).catch(() => { if (mounted.current) setLoading(false); });

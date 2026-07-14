@@ -4,6 +4,7 @@
 // JS 无法读取，所以用 Zustand store 跟踪"是否登录"这个状态就够了。
 
 import { create } from "zustand";
+import { preloadAll, clearUserPreload } from "@/lib/preload-cache";
 
 export interface User {
   id: string;
@@ -34,7 +35,7 @@ interface AuthState {
 // 请求超时时间：避免 Vercel 冷启动等情况下请求长时间挂起导致页面永远停在「加载中」
 const FETCH_USER_TIMEOUT = 15_000;
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isLoading: true, // 初始为 true，页面加载时会立刻请求 /api/auth/me
   loadError: false,
@@ -57,6 +58,8 @@ export const useAuthStore = create<AuthState>((set) => ({
         const body = await res.json();
         if (body.success && body.data) {
           set({ user: body.data, isLoading: false, loadError: false });
+          // 登录/会话恢复后，后台预加载需要联动数据库的内容，存入本地缓存（秒开）
+          preloadAll(body.data.id).catch(() => {});
           return;
         }
       }
@@ -71,11 +74,13 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   // 调用 /api/auth/logout 退出
   logout: async () => {
+    const prevId = get().user?.id;
     try {
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     } catch {
       // 即使请求失败，也清除本地状态
     }
+    if (prevId) clearUserPreload(prevId);
     set({ user: null });
   },
 }));
