@@ -8,11 +8,12 @@ import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PreviewModal } from "@/components/editor/PreviewModal";
 import { ExportMenu } from "@/components/editor/ExportMenu";
+import { ImportDocxModal } from "@/components/editor/ImportDocxModal";
 import { CustomDialog } from "@/components/ui/CustomDialog";
 import Link from "next/link";
 import {
   BookOpen, FileText, XCircle, Search, Filter,
-  ExternalLink, Trash2, Clock, UserCheck, Eye, MessageSquare,
+  ExternalLink, Trash2, Clock, UserCheck, Eye, MessageSquare, FileUp,
 } from "lucide-react";
 import { KnowledgeChat } from "@/components/ai/KnowledgeChat";
 import { getAllCategories, getCategoryColor } from "@/types";
@@ -39,6 +40,7 @@ export default function KnowledgePage() {
   const [previewDoc, setPreviewDoc] = useState<KnowledgeDoc | null>(null);
   const [confirmDel, setConfirmDel] = useState<{ docId: string; title: string } | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [showDocxImport, setShowDocxImport] = useState(false);
   const allCats = getAllCategories();
 
   const showToast = (type: "success" | "error", msg: string) => {
@@ -98,6 +100,35 @@ export default function KnowledgePage() {
     return true;
   });
 
+  // 从 Word 导入并强制审阅（知识库仅收纳已审阅公文）
+  const importDocx = async (data: { html: string; title: string; category: string }) => {
+    try {
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: data.title,
+          category: data.category,
+          content: data.html,
+          format: "gb",
+          reviewed: true,
+          reviewerName: "系统导入",
+        }),
+      });
+      const b = await res.json();
+      if (b.success) {
+        setShowDocxImport(false);
+        invalidateCache("knowledge:");
+        loadDocs();
+        showToast("success", `「${data.title}」已导入并标记为已审阅`);
+      } else {
+        showToast("error", b.error?.message || "导入失败");
+      }
+    } catch {
+      showToast("error", "网络错误");
+    }
+  };
+
   return (
     <DashboardLayout title="公文知识库">
       <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-4">
@@ -118,6 +149,10 @@ export default function KnowledgePage() {
             <button onClick={loadDocs} title="刷新"
               className="p-1.5 text-gray-400 hover:text-[#163f3a] rounded-lg hover:bg-[#163f3a]/5">
               <Clock className="w-4 h-4" />
+            </button>
+            <button onClick={() => setShowDocxImport(true)} title="从 Word 导入"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">
+              <FileUp className="w-3.5 h-3.5" /> 导入 DOCX
             </button>
           </div>
         </div>
@@ -229,6 +264,15 @@ export default function KnowledgePage() {
         <MessageSquare className="w-6 h-6" />
       </button>
       <KnowledgeChat open={chatOpen} onClose={() => setChatOpen(false)} />
+
+      {/* 从 Word 导入弹窗（强制审阅） */}
+      <ImportDocxModal
+        open={showDocxImport}
+        onClose={() => setShowDocxImport(false)}
+        onConfirm={importDocx}
+        forceReview
+        submitLabel="导入并审阅"
+      />
 
       {/* 预览弹窗（复刻文档管理预览） */}
       <PreviewModal

@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import {
   Shield, Users, User as UserIcon, ChevronDown, ChevronUp,
-  Check, X, Loader2, Crown, UserCog,
+  Check, X, Loader2, Crown, UserCog, AlertCircle,
 } from "lucide-react";
 
 interface PermissionDef {
@@ -52,6 +52,8 @@ export default function UserAdminPanel() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 数据库身份变更指南（可折叠）
+  const [showGuide, setShowGuide] = useState(false);
 
   // 抽屉内草稿：本地勾选/切换，保存时才提交
   const [draftRole, setDraftRole] = useState<Role>("user");
@@ -374,6 +376,77 @@ export default function UserAdminPanel() {
                 </div>
               );
             })}
+          </div>
+        )}
+      </section>
+
+      {/* ── 数据库身份变更指南 ── */}
+      <section className="mt-6">
+        <button
+          onClick={() => setShowGuide(!showGuide)}
+          className="flex items-center gap-2 w-full text-left px-3 py-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors"
+        >
+          <Shield className="w-4 h-4 text-[#163f3a]" />
+          <span className="text-xs font-medium text-gray-700 flex-1">数据库身份变更指南（超管 / 管理员 标识符）</span>
+          {showGuide ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+        </button>
+
+        {showGuide && (
+          <div className="mt-2 p-4 bg-white border border-gray-200 rounded-xl text-[12px] text-gray-600 leading-relaxed space-y-4">
+            <p className="text-gray-500">
+              本系统的身份由 <code className="px-1 bg-gray-100 rounded">users</code> 表的 <code className="px-1 bg-gray-100 rounded">role</code> 字段，
+              以及两张权限表共同决定。前端页面只做展示与授权，<strong className="text-gray-700">真正改身份必须直接改数据库</strong>。
+            </p>
+
+            <div>
+              <p className="font-medium text-gray-700 mb-1">① 身份判定规则</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li><strong>超级管理员</strong>：<code className="px-1 bg-gray-100 rounded">users.role = 'super_admin'</code> <span className="text-gray-400">且</span> <code className="px-1 bg-gray-100 rounded">sys_super_admin</code> 白名单中存在该 <code className="px-1 bg-gray-100 rounded">user_id</code>（两者须同时成立）。</li>
+                <li><strong>管理员</strong>：<code className="px-1 bg-gray-100 rounded">users.role = 'admin'</code>，权限明细记录在 <code className="px-1 bg-gray-100 rounded">user_permission(user_id, permission_id)</code>。</li>
+                <li><strong>普通用户</strong>：<code className="px-1 bg-gray-100 rounded">users.role = 'user'</code>，无权限行。</li>
+              </ul>
+            </div>
+
+            <div>
+              <p className="font-medium text-gray-700 mb-1">② 先拿到 user_id</p>
+              <p className="mb-1 text-gray-500">在数据库执行：</p>
+              <pre className="bg-gray-900 text-gray-100 text-[11px] p-2.5 rounded-lg overflow-auto">SELECT id, email, name FROM users;</pre>
+              <p className="mt-1 text-gray-500">复制目标用户的 <code className="px-1 bg-gray-100 rounded">id</code>（形如 <code className="px-1 bg-gray-100 rounded">user_xxx</code>）替换下面 SQL 中的 <code className="px-1 bg-gray-100 rounded">&lt;USER_ID&gt;</code>。</p>
+            </div>
+
+            <div>
+              <p className="font-medium text-gray-700 mb-1">③ 设为超级管理员</p>
+              <pre className="bg-gray-900 text-gray-100 text-[11px] p-2.5 rounded-lg overflow-auto">{`-- 同时写两处，缺一不可
+UPDATE users SET role = 'super_admin' WHERE id = '<USER_ID>';
+INSERT INTO sys_super_admin (user_id, create_time, remark)
+VALUES ('<USER_ID>', strftime('%s','now'), '手动授权');`}</pre>
+            </div>
+
+            <div>
+              <p className="font-medium text-gray-700 mb-1">④ 设为管理员并分配权限</p>
+              <pre className="bg-gray-900 text-gray-100 text-[11px] p-2.5 rounded-lg overflow-auto">{`UPDATE users SET role = 'admin' WHERE id = '<USER_ID>';
+DELETE FROM user_permission WHERE user_id = '<USER_ID>';
+-- 按需插入权限：crawler_manage / user_manage / reviewer_manage /
+-- skill_manage / api_config / system_settings
+INSERT INTO user_permission (user_id, permission_id, granted_at)
+VALUES ('<USER_ID>', 'crawler_manage', strftime('%s','now'));`}</pre>
+            </div>
+
+            <div>
+              <p className="font-medium text-gray-700 mb-1">⑤ 降为普通用户 / 撤销超管</p>
+              <pre className="bg-gray-900 text-gray-100 text-[11px] p-2.5 rounded-lg overflow-auto">{`UPDATE users SET role = 'user' WHERE id = '<USER_ID>';
+DELETE FROM user_permission WHERE user_id = '<USER_ID>';
+DELETE FROM sys_super_admin WHERE user_id = '<USER_ID>';`}</pre>
+            </div>
+
+            <div className="flex items-start gap-2 text-[11px] text-amber-700 bg-amber-50 px-3 py-2 rounded-lg">
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              <span>
+                注意：<strong>务必至少保留一名超级管理员</strong>，否则系统将无人可授权。
+                改完身份后，相关用户需<strong>重新登录</strong>（JWT 携带的角色在登录时写入）才能生效。
+                <code className="px-1 bg-amber-100 rounded">sys_super_admin</code> 无任何前端增删入口，只能手动写库。
+              </span>
+            </div>
           </div>
         )}
       </section>

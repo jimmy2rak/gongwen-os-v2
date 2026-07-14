@@ -9,13 +9,14 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PreviewModal } from "@/components/editor/PreviewModal";
 import { ExportMenu } from "@/components/editor/ExportMenu";
 import { ReviewDialog } from "@/components/editor/ReviewDialog";
+import { ImportDocxModal } from "@/components/editor/ImportDocxModal";
 import { CategoryFilterPills } from "@/components/ui/CategoryFilterPills";
 import { getCategoryColor, getAllCategories, DOCUMENT_CATEGORIES } from "@/types";
 import { getFavoriteIds, isFavorite, toggleFavorite } from "@/lib/favorite-store";
 import { cachedFetch, invalidateCache } from "@/lib/cache";
 import {
   Search, Plus, FileText, Trash2, Edit3, Eye, SendHorizonal,
-  Clock, CheckCircle, AlertCircle, X, Filter, ArrowUpDown, Star,
+  Clock, CheckCircle, AlertCircle, X, Filter, ArrowUpDown, Star, FileUp,
 } from "lucide-react";
 
 interface DocItem {
@@ -77,6 +78,8 @@ export default function DocumentsPage() {
   const sortFields = ["更新时间", "文件名", "公文类型", "审阅状态"] as const;
   const [sortPriority, setSortPriority] = useState<string[]>(["更新时间", "文件名", "公文类型", "审阅状态"]);
   const [showSortMenu, setShowSortMenu] = useState(false);
+  // 从 Word 导入弹窗
+  const [showDocxImport, setShowDocxImport] = useState(false);
 
   // 排序函数：按优先级多字段排序
   const sortDocs = (list: DocItem[]): DocItem[] => {
@@ -232,6 +235,28 @@ export default function DocumentsPage() {
   const handleEdit = (id: string) => { window.location.href = `/documents/${id}`; };
   const handleNew = () => { window.location.href = "/"; };
 
+  // 从 Word 导入：创建新文档并刷新列表
+  const importDocx = async (data: { html: string; title: string; category: string }) => {
+    try {
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: data.title, category: data.category, content: data.html, format: "gb" }),
+      });
+      const b = await res.json();
+      if (b.success) {
+        setShowDocxImport(false);
+        invalidateCache("documents:");
+        loadDocs(searchInput, catFilter, true);
+        showDialog("导入成功", `「${data.title}」已导入到文档库`);
+      } else {
+        showDialog("导入失败", b.error?.message || "创建文档失败");
+      }
+    } catch {
+      showDialog("导入失败", "网络错误");
+    }
+  };
+
   // ─── 删除前置校验 + 执行 ─────────────────────
   // 先检查选中文档的审阅状态，已审阅 → 弹窗拦截；非已审阅 → 走原有删除流程
   const handleDeleteClick = async (id: string) => {
@@ -354,6 +379,12 @@ export default function DocumentsPage() {
             className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
           >
             <Plus className="w-4 h-4" /> 新建文档
+          </button>
+          <button
+            onClick={() => setShowDocxImport(true)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <FileUp className="w-4 h-4" /> 导入 DOCX
           </button>
         </div>
 
@@ -638,6 +669,14 @@ export default function DocumentsPage() {
         open={!!reviewDocId}
         onClose={() => setReviewDocId(null)}
         onReview={handleReview}
+      />
+
+      {/* 从 Word 导入弹窗 */}
+      <ImportDocxModal
+        open={showDocxImport}
+        onClose={() => setShowDocxImport(false)}
+        onConfirm={importDocx}
+        submitLabel="导入到文档库"
       />
 
       {/* 内部提示弹窗（替代原生 alert / 已审阅拦截） */}

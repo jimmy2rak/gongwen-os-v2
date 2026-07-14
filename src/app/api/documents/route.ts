@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { title, category, content, format, meta } = body;
+    const { title, category, content, format, meta, reviewed, reviewerId, reviewerName } = body;
 
     if (!title) {
       return NextResponse.json(
@@ -133,25 +133,50 @@ export async function POST(req: NextRequest) {
     }
 
     const now = new Date();
+    const nowSec = Math.floor(Date.now() / 1000);
     const docId = `doc${nanoid(16)}`;
     const metaStr = meta ? (typeof meta === "string" ? meta : JSON.stringify(meta)) : "{}";
     const formatVal = format || "gb";
 
+    // 知识库导入等场景可携带 reviewed=true 强制标记已审阅
+    const reviewedFlag = reviewed === true ? 1 : 0;
+    const reviewerIdVal = reviewedFlag ? (reviewerId || user.id) : null;
+    const reviewerNameVal = reviewedFlag ? (reviewerName || user.name || user.email || "系统导入") : null;
+
     // 先创建文档（使用原生 libSQL 客户端，drizzle 的 insert 在某些版本有兼容问题）
     await client.execute({
-      sql: "INSERT INTO documents (id, title, category, format, content, meta, user_id, reviewed, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      args: [docId, title, category || "通知", formatVal, content || "", metaStr, user.id, 0, Math.floor(Date.now() / 1000), Math.floor(Date.now() / 1000)],
+      sql: "INSERT INTO documents (id, title, category, format, content, meta, user_id, reviewed, reviewer_id, reviewed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      args: [docId, title, category || "通知", formatVal, content || "", metaStr, user.id, reviewedFlag, reviewerIdVal, reviewedFlag ? nowSec : null, nowSec, nowSec],
     });
 
     // 再创建初始版本 v0（存储基线内容，所有后续编辑基于此对比）
     await client.execute({
       sql: "INSERT INTO versions (id, document_id, content, data, type, version_number, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      args: [`ver${nanoid(16)}`, docId, content || "", JSON.stringify({ title, category, content, format: formatVal, meta: metaStr }), "初始", 0, Math.floor(Date.now() / 1000)],
+      args: [`ver${nanoid(16)}`, docId, content || "", JSON.stringify({ title, category, content, format: formatVal, meta: metaStr }), "初始", 0, nowSec],
     });
+
+    // 强制审阅（知识库导入）：写入一条 approved 审阅记录，使知识库列表能显示审阅人
+    if (reviewedFlag) {
+      await client.execute({
+        sql: "INSERT INTO reviews (id, document_id, reviewer_id, reviewer_name, department, review_status, comment, operated_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        args: [
+          `rev${nanoid(16)}`,
+          docId,
+          reviewerIdVal,
+          reviewerNameVal || "系统导入",
+          "",
+          "approved",
+          "从 Word 文档导入并自动审阅",
+          nowSec,
+          nowSec,
+          nowSec,
+        ],
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      data: { id: docId, title, category, format: formatVal },
+      data: { id: docId, title, category, format: formatVal, reviewed: !!reviewedFlag },
     });
   } catch (error) {
     console.error("[Documents POST] Error details:", error);

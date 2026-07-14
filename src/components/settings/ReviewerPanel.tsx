@@ -21,22 +21,30 @@ const DEFAULT_REVIEWERS: Reviewer[] = [
   { id: "r4", name: "赵副科长", department: "综合科" },
 ];
 
-const STORAGE_KEY = "gw-reviewers";
-
 function uid() { return "rv" + Math.random().toString(36).slice(2, 10); }
 
-function loadReviewers(): Reviewer[] {
-  if (typeof window === "undefined") return [];
+// 从服务端读取审阅人（与编辑器/文档管理共用同一数据源）
+async function loadReviewers(): Promise<Reviewer[]> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_REVIEWERS;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_REVIEWERS;
-  } catch { return DEFAULT_REVIEWERS; }
+    const res = await fetch("/api/reviewers");
+    const body = await res.json();
+    if (body.success && Array.isArray(body.data)) return body.data;
+  } catch {}
+  return DEFAULT_REVIEWERS;
 }
 
-function saveReviewers(list: Reviewer[]) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch {}
+// 整体保存到服务端
+async function saveReviewers(list: Reviewer[]): Promise<boolean> {
+  try {
+    const res = await fetch("/api/reviewers", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reviewers: list }),
+    });
+    const body = await res.json();
+    if (body.success) return true;
+  } catch {}
+  return false;
 }
 
 /** 从审阅人列表中提取去重排序后的部门列表 */
@@ -50,6 +58,7 @@ export default function ReviewerPanel() {
   const [form, setForm] = useState<Reviewer>({ id: "", name: "", department: "" });
   const [showForm, setShowForm] = useState(false);
   const [confirmDel, setConfirmDel] = useState<{ id: string } | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // 部门下拉选单：新增部门 inline 模式
   const [showNewDeptInput, setShowNewDeptInput] = useState(false);
@@ -65,9 +74,20 @@ export default function ReviewerPanel() {
     memberCount: number;
   } | null>(null);
 
-  useEffect(() => { setList(loadReviewers()); }, []);
+  useEffect(() => {
+    loadReviewers().then(setList);
+  }, []);
 
-  const refresh = () => setList(loadReviewers());
+  // 重新读取最新列表
+  const refresh = () => { loadReviewers().then(setList); };
+  // 保存后刷新（保证与服务器一致）
+  const persist = async (next: Reviewer[]) => {
+    setSaving(true);
+    const ok = await saveReviewers(next);
+    setSaving(false);
+    if (ok) setList(next);
+    else refresh(); // 失败回读
+  };
   const departments = getDepartments(list);
 
   // ── 新增/编辑审阅人 ──
@@ -93,8 +113,7 @@ export default function ReviewerPanel() {
     const updated = editing
       ? list.map((r) => r.id === editing.id ? { ...form, name: form.name.trim(), department: dept } : r)
       : [...list, { ...form, name: form.name.trim(), department: dept }];
-    saveReviewers(updated);
-    refresh();
+    persist(updated);
     setShowForm(false);
   };
 
@@ -134,8 +153,7 @@ export default function ReviewerPanel() {
     if (members.length === 0) {
       // 无人，直接删除（实际是清空部门字段）
       const updated = list.map((r) => r.department === dept ? { ...r, department: "" } : r);
-      saveReviewers(updated);
-      refresh();
+      persist(updated);
     } else {
       // 有人，弹出迁移确认
       const otherDepts = departments.filter((d) => d !== dept);
@@ -162,8 +180,7 @@ export default function ReviewerPanel() {
         r.department === dept ? { ...r, department: "" } : r
       );
     }
-    saveReviewers(updated);
-    refresh();
+    persist(updated);
     setDeptDeleteConfirm(null);
   };
 
@@ -416,8 +433,7 @@ export default function ReviewerPanel() {
         cancelText="取消"
         onConfirm={() => {
           if (confirmDel) {
-            saveReviewers(list.filter((r) => r.id !== confirmDel.id));
-            refresh();
+            persist(list.filter((r) => r.id !== confirmDel.id));
             setConfirmDel(null);
           }
         }}

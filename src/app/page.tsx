@@ -11,6 +11,7 @@ import { useEditorStore, DEFAULT_META } from "@/stores/editor.store";
 import { CustomDialog } from "@/components/ui/CustomDialog";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { DocEditor } from "@/components/editor/DocEditor";
+import { ImportDocxModal } from "@/components/editor/ImportDocxModal";
 import { AiAssistant } from "@/components/editor/AiAssistant";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { EditorMetaBar } from "@/components/editor/EditorMetaBar";
@@ -19,7 +20,7 @@ import { getAllCategories, getCategoryColor } from "@/types";
 import { buildDocFromTemplate } from "@/lib/template-to-doc";
 import { markdownToGovDocHtml, looksLikeMarkdown } from "@/lib/markdown";
 import {
-  Save, Download, ChevronDown, Plus, Clock, CheckCircle, AlertTriangle,
+  Save, Download, ChevronDown, Plus, Clock, CheckCircle, AlertTriangle, FileText,
 } from "lucide-react";
 import type { Editor } from "@tiptap/react";
 import { ReviewDialog } from "@/components/editor/ReviewDialog";
@@ -45,6 +46,17 @@ export default function HomePage() {
   // 新建文档弹窗状态
   const [newDocCat, setNewDocCat] = useState<string | null>(null);
   const [selectedTplId, setSelectedTplId] = useState<string>("");
+  // 从 Word 导入弹窗
+  const [showDocxImport, setShowDocxImport] = useState(false);
+
+  // 从 Word 导入：识别后载入当前编辑器（作为新文档）
+  const handleDocxImport = (data: { html: string; title: string; category: string }) => {
+    store.initDoc({ title: data.title, content: data.html, category: data.category, format: "gb" });
+    editorInstance?.commands.setContent(data.html, { emitUpdate: false });
+    setShowDocxImport(false);
+    store.setShowNewDocDialog(false);
+    showDialog("导入成功", "已从 Word 文档识别内容并载入编辑器，可直接修改");
+  };
 
   const store = useEditorStore();
   const allCats = getAllCategories();
@@ -734,9 +746,31 @@ export default function HomePage() {
                 <div className="text-[11px] text-gray-400">跳过模板，创建空白文档</div>
               </div>
             </button>
+
+            {/* 从 Word 文档导入（识别后编辑） */}
+            <button
+              onClick={() => { setShowDocxImport(true); }}
+              className="w-full p-4 border-2 border-dashed border-gray-200 rounded-xl hover:border-[#163f3a]/40 hover:bg-[#163f3a]/5 transition-all flex items-center justify-center gap-3"
+            >
+              <div className="w-10 h-10 rounded-full bg-[#163f3a]/10 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-[#163f3a]" />
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-medium text-gray-700">从 Word 文档导入</div>
+                <div className="text-[11px] text-gray-400">选择 .docx，自动识别正文并载入编辑器</div>
+              </div>
+            </button>
           </div>
         </div>
       )}
+
+      {/* 从 Word 导入弹窗 */}
+      <ImportDocxModal
+        open={showDocxImport}
+        onClose={() => setShowDocxImport(false)}
+        onConfirm={handleDocxImport}
+        submitLabel="载入编辑器"
+      />
 
       {/* 全局内部提示弹窗 */}
       <CustomDialog

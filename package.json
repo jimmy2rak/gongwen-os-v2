@@ -50,6 +50,7 @@
     "drizzle-orm": "^0.45.2",
     "jose": "^6.2.3",
     "lucide-react": "^1.23.0",
+    "mammoth": "^1.12.0",
     "marked": "^18.0.5",
     "nanoid": "^5.1.16",
     "next": "16.2.10",
