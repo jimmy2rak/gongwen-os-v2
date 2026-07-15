@@ -7,6 +7,10 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth.store";
+// 编辑器样式：提升到共享布局，使所有登录后页面都链接该 CSS，
+// 避免 Next.js 在预取「公文编辑器」路由时仅 preload 而不 link 导致的
+// “was preloaded using link preload but not used” 警告。
+import "@/components/editor/editor.css";
 
 export default function DashboardPageLayout({
   children,

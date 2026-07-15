@@ -8,7 +8,8 @@ import { useEffect, useState } from "react";
 import { useAuthStore } from "@/stores/auth.store";
 import { proxyImageUrl } from "@/lib/image-proxy";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { User, Mail, Phone, KeyRound, Lock, CheckCircle, AlertTriangle, Image as ImageIcon } from "lucide-react";
+import { User, Mail, Phone, KeyRound, Lock, CheckCircle, AlertTriangle, Image as ImageIcon, Crop } from "lucide-react";
+import AvatarCropper from "@/components/settings/AvatarCropper";
 
 export default function AccountPage() {
   const user = useAuthStore((s) => s.user);
@@ -19,6 +20,8 @@ export default function AccountPage() {
   const [phone, setPhone] = useState("");
   const [avatar, setAvatar] = useState("");
   const [avatarError, setAvatarError] = useState(false);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [cropSrc, setCropSrc] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -138,7 +141,19 @@ export default function AccountPage() {
                 placeholder="https://... 留空则使用首字母头像"
                 className={`${inputClass} flex-1`}
               />
+              <button
+                type="button"
+                onClick={() => { setCropSrc(avatar); setCropOpen(true); }}
+                disabled={!avatar.trim()}
+                className="flex items-center gap-1 px-3 py-2 text-xs text-[#163f3a] bg-white border border-[#163f3a]/30 rounded-lg hover:bg-[#163f3a]/5 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                title="粘贴链接后框选头像范围"
+              >
+                <Crop className="w-3.5 h-3.5" /> 框选裁剪
+              </button>
             </div>
+            <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
+              提示：请粘贴图片直链（在图片上右键 → 复制图片地址，形如 <span className="font-mono">images.unsplash.com/...</span>）；粘贴后点「框选裁剪」可手动拖拽/缩放调整头像范围。
+            </p>
           </div>
 
           {/* 昵称 */}
@@ -190,6 +205,18 @@ export default function AccountPage() {
           </button>
         </div>
       </div>
+
+      {cropOpen && (
+        <AvatarCropper
+          src={cropSrc}
+          onCancel={() => setCropOpen(false)}
+          onCropped={(dataUrl) => {
+            setAvatar(dataUrl);
+            setAvatarError(false);
+            setCropOpen(false);
+          }}
+        />
+      )}
     </DashboardLayout>
   );
 }
