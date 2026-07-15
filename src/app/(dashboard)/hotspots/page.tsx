@@ -229,14 +229,69 @@ export default function HotArticlesPage() {
 </body></html>`
     : "";
 
-  // 点击文章行任意位置进入预览
-  const handleRowClick = (item: HotArticleItem) => {
+  // 记录列表滚动位置，关闭阅读视图后恢复原位
+  const scrollPosRef = useRef(0);
+
+  // 打开内嵌阅读视图（铺满内容区，替换列表）
+  const openPreview = (item: HotArticleItem) => {
+    const main = document.querySelector("main");
+    scrollPosRef.current = main ? main.scrollTop : 0;
     setPreview(item);
   };
 
+  // 点击文章行任意位置进入阅读视图
+  const handleRowClick = (item: HotArticleItem) => {
+    openPreview(item);
+  };
+
+  // 关闭阅读视图时恢复列表滚动位置
+  useEffect(() => {
+    if (!preview) {
+      const main = document.querySelector("main");
+      if (main) requestAnimationFrame(() => { main.scrollTop = scrollPosRef.current; });
+    }
+  }, [preview]);
+
   return (
     <DashboardLayout title="热点推送">
-      <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
+      {preview ? (
+        /* ── 内嵌阅读视图：铺满内容区，非全屏弹窗；关闭后列表滚动位置不变 ── */
+        <div className="h-full flex flex-col bg-background">
+          <div className="flex items-center justify-between px-4 md:px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <Eye className="w-4 h-4 text-cyan-600 flex-shrink-0" />
+              <h2 className="text-sm font-medium text-gray-800 truncate">热点推送 · {preview.title}</h2>
+              {preview.originUrl && (
+                <a href={preview.originUrl} target="_blank" rel="noreferrer"
+                  className="text-xs text-blue-500 hover:underline flex items-center gap-0.5 flex-shrink-0">
+                  <ExternalLink className="w-3 h-3" /> 原文
+                </a>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <button onClick={() => handleEditAsDoc(preview)}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-[#163f3a] text-white rounded-lg hover:bg-[#163f3a]/80">
+                <FileText className="w-3 h-3" /> 创建为文档
+              </button>
+              <button onClick={() => { setFavCat(preview.columnId || "通知"); setFavDialog(preview); }}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-amber-500 text-white rounded-lg hover:bg-amber-600">
+                <Star className="w-3 h-3" /> 收藏
+              </button>
+              <button onClick={() => setPreview(null)}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100" title="关闭">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          <iframe
+            title={preview.title}
+            srcDoc={previewSrcDoc}
+            className="flex-1 w-full min-h-0 bg-white"
+            sandbox="allow-scripts"
+          />
+        </div>
+      ) : (
+        <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
         {/* 头部 — 统一标题 "热点推送"，无副标题 */}
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-800">热点推送</h2>
@@ -305,8 +360,8 @@ export default function HotArticlesPage() {
                   </div>
                   {/* 操作按钮 — 阻止点击冒泡，以免触发行点击预览 */}
                   <div className="flex items-center gap-1 flex-shrink-0 mt-2 md:mt-0 justify-end md:justify-start" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => setPreview(item)}
-                      className="p-1.5 rounded text-gray-400 hover:text-cyan-600 hover:bg-cyan-50" title="全屏预览">
+                    <button onClick={() => openPreview(item)}
+                      className="p-1.5 rounded text-gray-400 hover:text-cyan-600 hover:bg-cyan-50" title="阅读">
                       <Eye className="w-3.5 h-3.5" />
                     </button>
                     <ExportMenu title={item.title} content={item.contentPlain || item.title} size="sm" />
@@ -331,45 +386,7 @@ export default function HotArticlesPage() {
           </div>
         )}
       </div>
-
-      {/* ── 全屏 iframe 预览（非弹窗）── */}
-      {preview && (
-        <div className="fixed inset-0 z-[80] bg-black flex flex-col">
-          <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-200 flex-shrink-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <Eye className="w-4 h-4 text-cyan-600" />
-              <h2 className="text-sm font-medium text-gray-800 truncate">热点推送 · {preview.title}</h2>
-              {preview.originUrl && (
-                <a href={preview.originUrl} target="_blank" rel="noreferrer"
-                  className="text-xs text-blue-500 hover:underline flex items-center gap-0.5">
-                  <ExternalLink className="w-3 h-3" /> 原文
-                </a>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button onClick={() => handleEditAsDoc(preview)}
-                className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-[#163f3a] text-white rounded-lg hover:bg-[#163f3a]/80">
-                <FileText className="w-3 h-3" /> 创建为文档
-              </button>
-              <button onClick={() => { setFavCat(preview.columnId || "通知"); setFavDialog(preview); }}
-                className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-amber-500 text-white rounded-lg hover:bg-amber-600">
-                <Star className="w-3 h-3" /> 收藏
-              </button>
-              <button onClick={() => setPreview(null)}
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100" title="关闭">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-          <iframe
-            title={preview.title}
-            srcDoc={previewSrcDoc}
-            className="flex-1 w-full"
-            sandbox="allow-same-origin"
-          />
-        </div>
       )}
-
       {/* ── 收藏转文档弹窗 ── */}
       {favDialog && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40" onClick={() => setFavDialog(null)}>
