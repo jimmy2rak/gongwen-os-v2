@@ -164,5 +164,15 @@ export async function GET(req: NextRequest) {
     return jsonError("不支持的协议", 400);
   }
 
+  // 已知「图片页」域名：其网页地址无法被服务端代理抓取，必须粘贴图片直链。
+  // 提前给出明确指引，避免无意义的抓取与 502。
+  const host = parsed.hostname.toLowerCase();
+  if (host.endsWith("unsplash.com") && parsed.pathname.startsWith("/photos/")) {
+    return jsonError(
+      "Unsplash 图片页需使用图片直链：在图片上右键 →「复制图片地址」（形如 https://images.unsplash.com/photo-xxxx?...），再粘贴到这里",
+      422,
+    );
+  }
+
   return proxyUrl(parsed, 0);
 }
