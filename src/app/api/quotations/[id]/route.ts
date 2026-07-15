@@ -8,10 +8,11 @@ function unauthorized() {
   return NextResponse.json({ success: false, error: { code: "UNAUTHORIZED", message: "未登录" } }, { status: 401 });
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getServerUser();
   if (!user) return unauthorized();
-  const id = req.nextUrl.searchParams.get("id");
+  const pathId = (await params).id;
+  const id = pathId || req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ success: false, error: { message: "缺少 id" } }, { status: 400 });
   try {
     await client.execute({ sql: `DELETE FROM quotations WHERE id = ? AND user_id = ?`, args: [id, user.id] });

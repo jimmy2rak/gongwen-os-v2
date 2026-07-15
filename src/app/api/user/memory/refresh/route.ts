@@ -130,6 +130,26 @@ async function gatherMemorySources(userId: string): Promise<string> {
     }
   }
 
+  // 金句库（体现用户偏好的表达风格与修辞）
+  budget = MAX - parts.join("\n\n").length;
+  if (budget > 500) {
+    try {
+      const qRes = await client.execute({
+        sql: "SELECT content, category FROM quotations WHERE user_id = ? ORDER BY created_at DESC LIMIT 60",
+        args: [userId],
+      });
+      const qRows = (qRes.rows as any[]) || [];
+      if (qRows.length > 0) {
+        const qLines = qRows
+          .map((r) => `- ${String(r.content || "")}${r.category ? `（${r.category}）` : ""}`)
+          .join("\n");
+        parts.push(`【金句库（用户精选佳句，体现其偏好的表达风格与修辞）】\n${qLines.slice(0, budget)}`);
+      }
+    } catch (e) {
+      console.error("[gatherMemorySources] 金句查询失败:", e);
+    }
+  }
+
   return parts.join("\n\n").slice(0, MAX);
 }
 

@@ -1354,12 +1354,18 @@ function TemplateFormModal({ initial, defaultCategory, allCategories, onSave, on
                 <input type="file" accept=".md,.json,.docx" className="hidden"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
               </label>
-              <button title="需配置 API 密钥"
-                className="flex items-center gap-1 px-2 py-1 text-[10px] text-amber-700 bg-amber-50 rounded hover:bg-amber-100">
-                ✨ AI 解析
-              </button>
             </div>
           </div>
+
+          <SourceGenerateBar
+            type="template"
+            category={category}
+            onGenerated={(c, n) => {
+              setContent(c);
+              setEditMode("json");
+              if (!name.trim() && n) setName(n);
+            }}
+          />
 
           {/* 编辑区 */}
           {editMode === "md" ? (
@@ -1493,12 +1499,18 @@ function SkillFormModal({ initial, defaultCategory, allCategories, onSave, onClo
                 <input type="file" accept=".md,.json,.docx" className="hidden"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
               </label>
-              <button title="需配置 API 密钥"
-                className="flex items-center gap-1 px-2 py-1 text-[10px] text-amber-700 bg-amber-50 rounded hover:bg-amber-100">
-                ✨ AI 解析
-              </button>
             </div>
           </div>
+
+          <SourceGenerateBar
+            type="skill"
+            category={category}
+            onGenerated={(c, n) => {
+              setContent(c);
+              setEditMode("md");
+              if (!name.trim() && n) setName(n);
+            }}
+          />
 
           {/* 编辑区 */}
           {editMode === "md" ? (
@@ -1529,6 +1541,83 @@ function SkillFormModal({ initial, defaultCategory, allCategories, onSave, onClo
             className="px-4 py-1.5 text-xs bg-[#163f3a] text-white rounded-lg hover:bg-[#163f3a]/90 disabled:bg-gray-300">保存</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── 子组件：来源勾选 + AI 生成（基于知识库/文档管理/金句库/热点推送 生成模板或 Skill）──
+
+const GEN_SOURCES: { key: string; label: string }[] = [
+  { key: "knowledge", label: "知识库" },
+  { key: "documents", label: "文档管理" },
+  { key: "quotations", label: "金句库" },
+  { key: "hotspots", label: "热点推送" },
+];
+
+function SourceGenerateBar({
+  type,
+  category,
+  onGenerated,
+}: {
+  type: "template" | "skill";
+  category: string;
+  onGenerated: (content: string, name: string) => void;
+}) {
+  const [sel, setSel] = useState<Set<string>>(new Set(["knowledge", "quotations"]));
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const toggle = (k: string) =>
+    setSel((p) => {
+      const n = new Set(p);
+      if (n.has(k)) n.delete(k);
+      else n.add(k);
+      return n;
+    });
+
+  const run = async () => {
+    if (sel.size === 0) {
+      setErr("请至少勾选一个来源");
+      return;
+    }
+    setLoading(true);
+    setErr(null);
+    try {
+      const r = await fetch("/api/ai/generate-from-sources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, category, sources: Array.from(sel) }),
+      });
+      const b = await r.json();
+      if (b.success) onGenerated(b.content || "", b.name || "");
+      else setErr(b.error?.message || "生成失败");
+    } catch {
+      setErr("网络错误");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[11px] text-gray-500">基于所选来源 AI 生成：</span>
+        {GEN_SOURCES.map((s) => (
+          <label key={s.key} className="flex items-center gap-1 text-[11px] text-gray-700 cursor-pointer select-none">
+            <input type="checkbox" checked={sel.has(s.key)} onChange={() => toggle(s.key)} className="accent-amber-500" />
+            {s.label}
+          </label>
+        ))}
+        <button
+          onClick={run}
+          disabled={loading}
+          className="ml-auto flex items-center gap-1 px-2.5 py-1 text-[11px] text-white bg-amber-500 rounded hover:bg-amber-600 disabled:opacity-60"
+        >
+          <Sparkles className="w-3 h-3" /> {loading ? "生成中..." : "AI 生成"}
+        </button>
+      </div>
+      {err && <div className="text-[11px] text-red-500">{err}</div>}
+      <p className="text-[10px] text-gray-400">生成结果将填入下方编辑区，可预览修改后保存。</p>
     </div>
   );
 }

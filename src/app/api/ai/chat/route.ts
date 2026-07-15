@@ -50,6 +50,24 @@ export async function POST(req: NextRequest) {
     console.error("[ai/chat] 读取用户记忆失败:", e);
   }
 
+  // 读取当前用户的金句库，注入系统提示词（供 AI 在写作中恰当引用）
+  let quotationContext = "";
+  try {
+    const qRes = await client.execute({
+      sql: "SELECT content, category FROM quotations WHERE user_id = ? ORDER BY created_at DESC LIMIT 40",
+      args: [user.id],
+    });
+    const qRows = (qRes.rows as any[]) || [];
+    if (qRows.length > 0) {
+      const lines = qRows
+        .map((r) => `- ${String(r.content || "")}${r.category ? `（${r.category}）` : ""}`)
+        .join("\n");
+      quotationContext = `【用户金句库（精选佳句，请在写作中恰当引用，保持文风一致、增强表现力；引用须忠于原意，可融入合适语境）】\n${lines}`;
+    }
+  } catch (e) {
+    console.error("[ai/chat] 读取金句失败:", e);
+  }
+
   // 解析 @ 引用的参考文章（知识库 / 编辑器提问通过 articleIds 传入）
   let articleContext = "";
   if (Array.isArray(body.articleIds) && body.articleIds.length > 0) {
@@ -131,7 +149,7 @@ export async function POST(req: NextRequest) {
   }
 
   const upstreamUrl = `${baseUrl}/chat/completions`;
-  const systemExtra = [body.systemExtra, userMemoryPrompt, articleContext].filter(Boolean).join("\n\n");
+  const systemExtra = [body.systemExtra, userMemoryPrompt, articleContext, quotationContext].filter(Boolean).join("\n\n");
   const systemPrompt = buildSystemPrompt(systemExtra);
   const payload = JSON.stringify({
     model,

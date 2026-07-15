@@ -41,6 +41,20 @@ export async function GET(req: NextRequest) {
   }
 }
 
+export async function DELETE(req: NextRequest) {
+  const user = await getServerUser();
+  if (!user) return unauthorized();
+  const id = req.nextUrl.searchParams.get("id");
+  if (!id) return NextResponse.json({ success: false, error: { message: "缺少 id" } }, { status: 400 });
+  try {
+    await client.execute({ sql: `DELETE FROM quotations WHERE id = ? AND user_id = ?`, args: [id, user.id] });
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    console.error("[quotations DELETE]", e);
+    return NextResponse.json({ success: false, error: { message: "删除失败" } }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   const user = await getServerUser();
   if (!user) return unauthorized();

@@ -511,6 +511,15 @@ export const BUILTIN_TEMPLATES: BuiltinTemplate[] = [
 
 // ── 辅助方法 ──
 
+// 为所有内置「十维写作」Skill 追加「金句引用」指引：写作时可恰当引用用户金句库佳句
+const QUOTE_REFERENCE_NOTE =
+  "\n【金句引用】写作时可恰当引用用户金句库中的精选佳句，使文风连贯、论据有力；引用须忠于原意、融入合适语境，并呼应其来源精神。";
+for (const t of BUILTIN_TEMPLATES) {
+  for (const s of t.builtinSkills) {
+    if (!s.content.includes("金句引用")) s.content += QUOTE_REFERENCE_NOTE;
+  }
+}
+
 /** 根据公文类型获取内置模板 */
 export function getBuiltinTemplate(category: string): BuiltinTemplate | undefined {
   return BUILTIN_TEMPLATES.find((t) => t.category === category);

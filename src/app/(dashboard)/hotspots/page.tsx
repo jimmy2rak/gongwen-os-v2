@@ -120,6 +120,7 @@ const QUOTE_SCRIPT = `
       var top = rect.top - 36; if(top<8) top = rect.bottom + 8;
       bubble.style.top = top + 'px';
       bubble.style.left = Math.min(Math.max(rect.left + rect.width/2 - 40, 8), (window.innerWidth||800)-100) + 'px';
+      bubble.onmousedown = function(e){ e.preventDefault(); };
       bubble.onclick = function(){
         parent.postMessage({ type:'gw-add-quote', text: text, sourceId: window.__GW_SRC__ ? window.__GW_SRC__.id : '', sourceTitle: window.__GW_SRC__ ? window.__GW_SRC__.title : '' }, '*');
         bubble.style.display='none';
