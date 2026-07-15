@@ -16,6 +16,9 @@ import { useRouter } from "next/navigation";
 import { toggleFavorite } from "@/lib/favorite-store";
 import { useAuthStore } from "@/stores/auth.store";
 import { getCachedData, writePreload } from "@/lib/preload-cache";
+import { AddQuoteDialog } from "@/components/quotations/AddQuoteDialog";
+import { useQuotationStore } from "@/stores/quotation.store";
+import type { Quote } from "@/lib/quotations/types";
 
 interface CacheItem { data: any; fetchedAt: number; }
 const _cache = new Map<string, CacheItem>();
@@ -25,6 +28,161 @@ function cachedFetch(key: string, fetcher: () => Promise<any>): Promise<any> {
   const hit = _cache.get(key);
   if (hit && Date.now() - hit.fetchedAt < STALE_MS) return Promise.resolve(hit.data);
   return fetcher().then((d) => { _cache.set(key, { data: d, fetchedAt: Date.now() }); return d; });
+}
+
+// ── 金句高亮样式（iframe 内联，与主站 quote.css 一致）──
+const QUOTE_CSS = `
+.gw-quote{position:relative;border-radius:2px;transition:background-color .15s ease;cursor:pointer}
+.gw-ch-start{position:relative}
+.gw-ch-start::before{content:"";position:absolute;top:-0.5em;left:-0.4em;width:7px;height:7px;border-radius:50%;background:#f5c518;box-shadow:0 0 0 1.5px #fff;z-index:3}
+.gw-ch-end{position:relative}
+.gw-ch-end::after{content:"";position:absolute;top:-0.5em;right:-0.4em;width:7px;height:7px;border-radius:50%;background:#f5c518;box-shadow:0 0 0 1.5px #fff;z-index:3}
+.gw-quote:hover{background-color:rgba(147,51,234,0.18)}
+@keyframes gwFlash{0%{background-color:rgba(245,197,24,0.45)}100%{background-color:transparent}}
+.gw-locate-flash{animation:gwFlash 1.6s ease}
+`;
+
+// ── iframe 内金句脚本：高亮 + 选区气泡(postMessage) + 定位闪烁 ──
+const QUOTE_SCRIPT = `
+(function(){
+  var quotes = window.__GW_QUOTES__ || [];
+  var locate = window.__GW_LOCATE__ || "";
+  function clearHighlights(root){
+    var els = root.querySelectorAll('span.gw-quote');
+    for(var i=0;i<els.length;i++){ var el=els[i]; var p=el.parentNode; if(!p) continue; while(el.firstChild) p.insertBefore(el.firstChild, el); p.removeChild(el); }
+  }
+  function wrapFirst(root, text){
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: function(n){
+        var tag = (n.parentNode && n.parentNode.tagName);
+        if(tag==='SCRIPT'||tag==='STYLE') return NodeFilter.FILTER_REJECT;
+        if(n.parentNode && n.parentNode.closest && n.parentNode.closest('.gw-quote')) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    var node;
+    while((node = walker.nextNode())){
+      var tn = node; var idx = tn.nodeValue ? tn.nodeValue.indexOf(text) : -1;
+      if(idx !== -1){
+        try {
+          var range = document.createRange();
+          range.setStart(tn, idx); range.setEnd(tn, idx+text.length);
+          var span = document.createElement('span'); span.className='gw-quote';
+          range.surroundContents(span);
+          var first = span.firstChild;
+          if(first && first.nodeType===3){
+            var len = first.nodeValue.length;
+            if(len<=1){ var w=document.createElement('span'); w.className='gw-ch gw-ch-start'; w.textContent=first.nodeValue; span.replaceChild(w, first); }
+            else {
+              var r1=document.createRange(); r1.setStart(first,0); r1.setEnd(first,1);
+              var s1=document.createElement('span'); s1.className='gw-ch gw-ch-start'; r1.surroundContents(s1);
+              var rest=s1.nextSibling;
+              if(rest && rest.nodeType===3 && rest.nodeValue && rest.nodeValue.length>=1){
+                var r2=document.createRange(); r2.setStart(rest, rest.nodeValue.length-1); r2.setEnd(rest, rest.nodeValue.length);
+                var s2=document.createElement('span'); s2.className='gw-ch gw-ch-end'; r2.surroundContents(s2);
+              }
+            }
+          }
+        } catch(e){}
+        return;
+      }
+    }
+  }
+  function apply(){
+    var root = document.querySelector('.gongwen-content');
+    if(!root) return;
+    clearHighlights(root);
+    for(var i=0;i<quotes.length;i++){ if(quotes[i].content) wrapFirst(root, quotes[i].content); }
+    if(locate){
+      var matches = root.querySelectorAll('span.gw-quote'); var target=null;
+      for(var j=0;j<matches.length;j++){ if(!target && (matches[j].textContent||'').indexOf(locate)>=0) target=matches[j]; }
+      if(!target){ var ps = root.querySelectorAll('p,li,div'); for(var k=0;k<ps.length;k++){ if(!target && (ps[k].textContent||'').indexOf(locate)>=0) target=ps[k]; } }
+      if(target){ target.scrollIntoView({behavior:'smooth', block:'center'}); target.classList.add('gw-locate-flash'); setTimeout(function(){ target.classList.remove('gw-locate-flash'); }, 1700); }
+    }
+  }
+  document.addEventListener('mouseup', function(){
+    setTimeout(function(){
+      var sel = window.getSelection();
+      if(!sel || sel.isCollapsed || sel.rangeCount===0) return;
+      var text = sel.toString().trim();
+      if(!text || text.length<2) return;
+      var range = sel.getRangeAt(0);
+      var rect = range.getBoundingClientRect();
+      if(rect.width===0 && rect.height===0) return;
+      var bubble = document.getElementById('gw-bubble');
+      if(!bubble){
+        bubble = document.createElement('div');
+        bubble.id='gw-bubble';
+        bubble.style.cssText='position:fixed;z-index:9999;display:flex;align-items:center;gap:4px;padding:4px 8px;font-size:12px;color:#fff;background:#f59e0b;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.25);cursor:pointer';
+        bubble.innerHTML='✦ 添加金句';
+        document.body.appendChild(bubble);
+      }
+      var top = rect.top - 36; if(top<8) top = rect.bottom + 8;
+      bubble.style.top = top + 'px';
+      bubble.style.left = Math.min(Math.max(rect.left + rect.width/2 - 40, 8), (window.innerWidth||800)-100) + 'px';
+      bubble.onclick = function(){
+        parent.postMessage({ type:'gw-add-quote', text: text, sourceId: window.__GW_SRC__ ? window.__GW_SRC__.id : '', sourceTitle: window.__GW_SRC__ ? window.__GW_SRC__.title : '' }, '*');
+        bubble.style.display='none';
+      };
+      bubble.style.display='flex';
+    }, 10);
+  });
+  document.addEventListener('selectionchange', function(){ var s=window.getSelection(); if(s && s.isCollapsed){ var b=document.getElementById('gw-bubble'); if(b) b.style.display='none'; } });
+  if(document.readyState!=='loading') apply(); else document.addEventListener('DOMContentLoaded', apply);
+})();
+`;
+
+function buildHotspotSrcDoc(item: HotArticleItem, quotes: Quote[], locate: string): string {
+  const body = item.contentHtml || `<p>${(item.contentPlain || "（无正文）").replace(/\n/g, "</p><p>")}</p>`;
+  const esc = (s: string) => s.replace(/</g, "\\u003c");
+  const quotesJson = esc(JSON.stringify(quotes.map((q) => ({ id: q.id, content: q.content }))));
+  const srcJson = esc(JSON.stringify({ id: item.id, title: item.title }));
+  const locateJson = esc(JSON.stringify(locate || ""));
+  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Noto Serif SC", "SimSun", "STSong", serif;
+    padding: 48px 56px;
+    max-width: 780px;
+    margin: 0 auto;
+    line-height: 1.9;
+    font-size: 16px;
+    color: #2b2722;
+    background: #f6f4ef;
+  }
+  [data-type="doc-title"],
+  h1, h2, h3, h4 { text-align: center; font-weight: 600; line-height: 1.6; margin-bottom: 1.2em; }
+  [data-type="doc-title"] { font-size: 22px; }
+  p { text-indent: 2em; margin-bottom: 0.8em; text-align: justify; }
+  .gongwen-content p { text-indent: 2em; margin-bottom: 0.8em; text-align: justify; }
+  .gongwen-content h2 { font-size: 18px; margin-top: 1.5em; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+  th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; font-size: 14px; }
+  th { background: #f0ede6; font-weight: 600; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #1a1e1d; color: #e8e4db; }
+    th { background: #2a2e2d; }
+    th, td { border-color: #3a3e3d; }
+    a { color: #c9a55c; }
+  }
+  img { max-width: 100%; height: auto; display: block; margin: 1em auto; }
+  blockquote { border-left: 3px solid #c9a55c; padding-left: 16px; margin: 1em 0; color: #666; }
+  @media (prefers-color-scheme: dark) { blockquote { color: #aaa; } }
+  ul, ol { padding-left: 2em; margin-bottom: 0.8em; }
+  li { margin-bottom: 0.3em; }
+</style>
+<style>${QUOTE_CSS}</style>
+</head><body>
+  <div class="gongwen-content">
+    ${body}
+  </div>
+  <script>window.__GW_QUOTES__=${quotesJson};window.__GW_SRC__=${srcJson};window.__GW_LOCATE__=${locateJson};</script>
+  <script>${QUOTE_SCRIPT}</script>
+</body></html>`;
 }
 
 interface HotArticleItem {
@@ -54,6 +212,13 @@ export default function HotArticlesPage() {
   // 收藏转文档弹窗
   const [favDialog, setFavDialog] = useState<HotArticleItem | null>(null);
   const [favCat, setFavCat] = useState<string>("通知");
+
+  // 金句：当前账号全部金句（用于热点文章内高亮）、添加弹窗、定位闪烁
+  const [allQuotes, setAllQuotes] = useState<Quote[]>([]);
+  const [quoteAdd, setQuoteAdd] = useState<{ text: string; sourceId: string; sourceTitle: string } | null>(null);
+  const [locateContent, setLocateContent] = useState("");
+  const pendingRef = useRef<{ sourceId: string; content: string } | null>(null);
+  const locatedRef = useRef(false);
 
   const allCats = getAllCategories();
   const mounted = useRef(true);
@@ -87,6 +252,35 @@ export default function HotArticlesPage() {
       .finally(() => { if (mounted.current) setLoading(false); });
   };
   useEffect(() => { mounted.current = true; loadData(); return () => { mounted.current = false; };   }, []);
+
+  // 拉取当前账号全部金句（用于热点文章内高亮）
+  const refreshQuotes = () => {
+    fetch("/api/quotations").then((r) => r.json()).then((b) => { if (b.success) setAllQuotes(b.data || []); }).catch(() => {});
+  };
+  useEffect(() => { refreshQuotes(); }, []);
+
+  // 监听 iframe 内「添加金句」选区气泡消息
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data && e.data.type === "gw-add-quote") {
+        setQuoteAdd({ text: e.data.text || "", sourceId: e.data.sourceId || "", sourceTitle: e.data.sourceTitle || "" });
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
+  // 从金句库跳转定位：读取 pendingLocate，文章加载后自动打开并定位
+  useEffect(() => {
+    const pl = useQuotationStore.getState().pendingLocate;
+    if (pl) { pendingRef.current = pl; useQuotationStore.getState().clearPendingLocate(); }
+  }, []);
+  useEffect(() => {
+    if (pendingRef.current && !locatedRef.current && items.length && !preview) {
+      const art = items.find((i) => i.id === pendingRef.current!.sourceId);
+      if (art) { locatedRef.current = true; setLocateContent(pendingRef.current.content); setPreview(art); }
+    }
+  }, [items]);
 
   // 去重后的筛选选项：来源（人民日报 / 新华网 等大分类）
   const srcs = Array.from(new Set(items.map((i) => i.sourceName).filter(Boolean) as string[])).sort();
@@ -178,56 +372,11 @@ export default function HotArticlesPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
 
-  // iframe 预览内容：渲染公文样式 + 黑暗模式适配
-  const previewSrcDoc = preview
-    ? `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: "Noto Serif SC", "SimSun", "STSong", serif;
-    padding: 48px 56px;
-    max-width: 780px;
-    margin: 0 auto;
-    line-height: 1.9;
-    font-size: 16px;
-    color: #2b2722;
-    background: #f6f4ef;
-  }
-  /* 正文渲染 */
-  [data-type="doc-title"],
-  h1, h2, h3, h4 { text-align: center; font-weight: 600; line-height: 1.6; margin-bottom: 1.2em; }
-  [data-type="doc-title"] { font-size: 22px; }
-  p { text-indent: 2em; margin-bottom: 0.8em; text-align: justify; }
-  /* 公文正文样式 */
-  .gongwen-content p { text-indent: 2em; margin-bottom: 0.8em; text-align: justify; }
-  .gongwen-content h2 { font-size: 18px; margin-top: 1.5em; }
-  table { border-collapse: collapse; width: 100%; margin: 1em 0; }
-  th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; font-size: 14px; }
-  th { background: #f0ede6; font-weight: 600; }
-  /* 黑暗模式 */
-  @media (prefers-color-scheme: dark) {
-    body { background: #1a1e1d; color: #e8e4db; }
-    th { background: #2a2e2d; }
-    th, td { border-color: #3a3e3d; }
-    a { color: #c9a55c; }
-  }
-  /* 图片自适应 */
-  img { max-width: 100%; height: auto; display: block; margin: 1em auto; }
-  blockquote { border-left: 3px solid #c9a55c; padding-left: 16px; margin: 1em 0; color: #666; }
-  @media (prefers-color-scheme: dark) { blockquote { color: #aaa; } }
-  /* 列表 */
-  ul, ol { padding-left: 2em; margin-bottom: 0.8em; }
-  li { margin-bottom: 0.3em; }
-</style>
-</head><body>
-  <div class="gongwen-content">
-    ${preview.contentHtml || `<p>${(preview.contentPlain || "（无正文）").replace(/\n/g, "</p><p>")}</p>`}
-  </div>
-</body></html>`
-    : "";
+  // iframe 预览内容：渲染公文样式 + 黑暗模式适配 + 金句高亮/选区气泡
+  const articleQuotes = preview
+    ? allQuotes.filter((q) => q.sourceType === "hotspot" && q.sourceId === preview.id)
+    : [];
+  const previewSrcDoc = preview ? buildHotspotSrcDoc(preview, articleQuotes, locateContent) : "";
 
   // 记录列表滚动位置，关闭阅读视图后恢复原位
   const scrollPosRef = useRef(0);
@@ -429,6 +578,17 @@ export default function HotArticlesPage() {
           {toast.type === "success" ? <CheckCircle className="w-4 h-4" /> : "✗"} {toast.msg}
         </div>
       )}
+
+      {/* 热点文章内选区 → 添加金句（来自 iframe postMessage） */}
+      <AddQuoteDialog
+        open={!!quoteAdd}
+        onClose={() => setQuoteAdd(null)}
+        defaultText={quoteAdd?.text || ""}
+        sourceType="hotspot"
+        sourceId={quoteAdd?.sourceId || ""}
+        sourceTitle={quoteAdd?.sourceTitle || ""}
+        onAdded={refreshQuotes}
+      />
     </DashboardLayout>
   );
 }

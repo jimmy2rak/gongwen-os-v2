@@ -12,6 +12,7 @@ import { buildSelectionInstruction, buildDocumentInstruction, ChatMessage } from
 import { buildGlobalContext } from "@/lib/ai/context";
 import { getGlobalSkills } from "@/lib/global-skill-store";
 import { MentionInput, type MentionItem } from "@/components/ai/MentionInput";
+import { AddQuoteDialog } from "@/components/quotations/AddQuoteDialog";
 import { Sparkles, Send, Copy, CornerDownLeft, Replace, X, RefreshCw, AlertCircle, Settings, ChevronDown, ChevronRight, Check, Quote, FileText } from "lucide-react";
 
 interface ModelOption {
@@ -27,6 +28,10 @@ export function AiAssistant({ editor }: { editor: Editor | null }) {
   const setSelectedText = useEditorStore((s) => s.setSelectedText);
   const setSelectionRect = useEditorStore((s) => s.setSelectionRect);
   const currentCategory = useEditorStore((s) => s.category); // 当前公文类型
+  const docId = useEditorStore((s) => s.docId); // 当前文档 id（用于金句来源）
+  const docTitle = useEditorStore((s) => s.title); // 当前文档标题
+  const [showQuoteDlg, setShowQuoteDlg] = useState(false);
+  const [quoteText, setQuoteText] = useState("");
 
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
   const [model, setModel] = useState<string>("");
@@ -591,8 +596,19 @@ export function AiAssistant({ editor }: { editor: Editor | null }) {
           <BubbleBtn label="扩写" onClick={() => quickAction("expand")} />
           <BubbleBtn label="解释" onClick={() => quickAction("explain")} />
           <BubbleBtn label="翻译" onClick={() => quickAction("translate")} />
+          <BubbleBtn label="金句" onClick={() => { setQuoteText(selectedText || ""); setShowQuoteDlg(true); }} />
         </div>
       )}
+
+      {/* 编辑器选区 → 添加金句 */}
+      <AddQuoteDialog
+        open={showQuoteDlg}
+        onClose={() => setShowQuoteDlg(false)}
+        defaultText={quoteText}
+        sourceType={docId ? "document" : "editor"}
+        sourceId={docId || ""}
+        sourceTitle={docTitle || ""}
+      />
 
       {/* 移动端悬浮 AI 入口（仅 <768px 显示） */}
       {!mobileOpen && (

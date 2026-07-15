@@ -1,0 +1,42 @@
+/* 金句高亮：头尾黄色圆点 + hover 半透明薄纱紫（仅 UI 提示，绝不进入导出文档） */
+.gw-quote {
+  position: relative;
+  border-radius: 2px;
+  transition: background-color 0.15s ease;
+  cursor: pointer;
+}
+.gw-ch-start { position: relative; }
+.gw-ch-start::before {
+  content: "";
+  position: absolute;
+  top: -0.55em;
+  left: -0.42em;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f5c518;
+  box-shadow: 0 0 0 1.5px #fff;
+  z-index: 3;
+}
+.gw-ch-end { position: relative; }
+.gw-ch-end::after {
+  content: "";
+  position: absolute;
+  top: -0.55em;
+  right: -0.42em;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f5c518;
+  box-shadow: 0 0 0 1.5px #fff;
+  z-index: 3;
+}
+/* hover 时整句半透明薄纱紫，但首尾黄点（::before/::after）保持不变 */
+.gw-quote:hover { background-color: rgba(147, 51, 234, 0.18); }
+
+/* 从金句库点击定位时的闪烁提示 */
+@keyframes gw-flash {
+  0% { background-color: rgba(245, 197, 24, 0.45); }
+  100% { background-color: transparent; }
+}
+.gw-locate-flash { animation: gw-flash 1.6s ease; }

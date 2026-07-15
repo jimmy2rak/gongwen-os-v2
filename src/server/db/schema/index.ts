@@ -6,6 +6,7 @@ export { verificationTokens } from "./auth";
 export { sessions } from "./sessions";
 export { documents } from "./documents";
 export { versions } from "./versions";
+export { quotations } from "./quotations";
 export { apiKeys } from "./apiKeys";
 export { skills } from "./skills";
 export { templates } from "./templates";

@@ -1,13 +1,18 @@
 // ─── 公文预览弹窗 ──────────────────────────────
 // 查看完整公文排版效果，支持导出、打印、跳转编辑
 // 样式复用 editor.css 中的公文排版规则
+// 金句：预览时注入头尾黄点 + hover 紫薄纱高亮；选中文字可添加金句；点击金句可删除
 
 "use client";
 
-import { useState, useEffect } from "react";
-import { X, Printer, ExternalLink, AlertTriangle } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, Printer, ExternalLink, AlertTriangle, Trash2, Quote as QuoteIcon } from "lucide-react";
 import { ExportMenu } from "./ExportMenu";
 import "@/components/editor/editor.css";
+import { useQuotations } from "@/lib/quotations/use-quotations";
+import { applyQuoteHighlights, locateAndFlash } from "@/lib/quotations/highlight";
+import { QuoteSelectionBubble } from "@/components/quotations/QuoteSelectionBubble";
+import type { Quote } from "@/lib/quotations/types";
 
 interface PreviewModalProps {
   open: boolean;
@@ -17,6 +22,10 @@ interface PreviewModalProps {
   /** 预览模式（影响排版样式） */
   docMode?: "simple" | "gb" | "official";
   docId: string | null;
+  /** 金句来源类型（默认 document） */
+  sourceType?: string;
+  /** 从金句库点击定位时，滚动并闪烁到该句 */
+  locateText?: string;
   onFullEdit?: () => void;
   /** 是否有未保存的修改 */
   hasUnsavedChanges?: boolean;
@@ -26,12 +35,25 @@ interface PreviewModalProps {
 
 export function PreviewModal({
   open, onClose, title, content, docMode = "simple", docId,
+  sourceType = "document", locateText,
   onFullEdit, hasUnsavedChanges, onSaveCurrent,
 }: PreviewModalProps) {
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [activeQuote, setActiveQuote] = useState<{ q: Quote; rect: DOMRect } | null>(null);
+  const { quotes, deleteQuote } = useQuotations(docId ?? undefined);
 
   // 关闭弹窗时重置保存对话框状态
   useEffect(() => { if (!open) setShowSaveDialog(false); }, [open]);
+
+  // 注入金句高亮 / 定位闪烁
+  useEffect(() => {
+    if (!open || !contentRef.current) return;
+    applyQuoteHighlights(contentRef.current, quotes, (q, rect) => setActiveQuote({ q, rect }));
+    if (locateText) {
+      requestAnimationFrame(() => locateAndFlash(contentRef.current!, locateText));
+    }
+  }, [open, quotes, content, locateText]);
 
   if (!open) return null;
 
@@ -62,6 +84,11 @@ export function PreviewModal({
   const handleDiscardThenEdit = () => {
     setShowSaveDialog(false);
     onFullEdit?.();
+  };
+
+  const doDeleteQuote = async (q: Quote) => {
+    await deleteQuote(q.id);
+    setActiveQuote(null);
   };
 
   return (
@@ -107,7 +134,12 @@ export function PreviewModal({
               <div className="document-editor">
                 <div className="document-page">
                   <div
+                    ref={contentRef}
                     className="ProseMirror"
+                    data-gw-article
+                    data-gw-source-type={sourceType}
+                    data-gw-source-id={docId || ""}
+                    data-gw-source-title={title}
                     dangerouslySetInnerHTML={{ __html: content }}
                   />
                 </div>
@@ -116,6 +148,35 @@ export function PreviewModal({
           </div>
         </div>
       </div>
+
+      {/* 选中文字 → 添加金句 气泡（仅文章容器内） */}
+      <QuoteSelectionBubble />
+
+      {/* 点击金句 → 删除气泡 */}
+      {activeQuote && (
+        <div
+          className="fixed z-[115] flex items-center gap-1 bg-gray-900 text-white rounded-lg shadow-lg px-1 py-1"
+          style={{
+            top: Math.max(activeQuote.rect.top - 44, 8),
+            left: Math.min(activeQuote.rect.left, (typeof window !== "undefined" ? window.innerWidth : 800) - 160),
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-2 py-1 text-[11px] max-w-[180px] truncate" title={activeQuote.q.content}>
+            “{activeQuote.q.content.slice(0, 12)}…”
+          </div>
+          <button
+            onClick={() => doDeleteQuote(activeQuote.q)}
+            className="flex items-center gap-0.5 px-2 py-1 text-xs bg-red-500 hover:bg-red-600 rounded"
+            title="删除金句"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> 删除
+          </button>
+          <button onClick={() => setActiveQuote(null)} className="p-1.5 text-gray-300 hover:text-white rounded" title="取消">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* 未保存修改确认弹窗 */}
       {showSaveDialog && (
