@@ -2,6 +2,14 @@
    三种模式：simple（简易）、gb（国标）、official（红头）
    核心规则遵循 GB/T 9704-2012 */
 
+/* ===== 通用字体回退（覆盖 Windows / macOS / Linux 常用中文字体） ===== */
+:root {
+  --font-gb-fangsong: "仿宋_GB2312", "仿宋", "FangSong", "STFangsong", "Fangsong SC", "FangSong_GB2312", var(--font-noto-serif-sc), "Songti SC", "SimSun", "STSong", serif;
+  --font-gb-kaiti: "楷体_GB2312", "楷体", "KaiTi", "KaiTi_GB2312", "STKaiti", "Kaiti SC", var(--font-noto-serif-sc), "Songti SC", "SimSun", serif;
+  --font-gb-heiti: "黑体", "SimHei", "Heiti SC", "STHeiti", "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --font-gb-title: "方正小标宋简体", "FZXiaoBiaoSong-B05S", "XiaoBiaoSong", var(--font-noto-serif-sc), "Songti SC", "SimSun", serif;
+}
+
 /* ===== 通用 ===== */
 .document-editor {
   font-family: "Times New Roman", "Times New Roman PS", var(--font-noto-serif-sc), serif;
@@ -110,7 +118,7 @@
 }
 
 .doc-mode-simple .document-editor .ProseMirror p {
-  font-family: "Times New Roman", "仿宋_GB2312", "仿宋", "FangSong", var(--font-noto-serif-sc), serif;
+  font-family: var(--font-gb-fangsong);
   font-size: 16pt;
   line-height: 28pt;
   margin: 0;
@@ -123,7 +131,7 @@
 .doc-mode-simple .document-editor .ProseMirror .doc-title,
 .doc-mode-gb .document-editor .ProseMirror .doc-title,
 .doc-mode-official .document-editor .ProseMirror .doc-title {
-  font-family: "Times New Roman", "方正小标宋简体", "FZXiaoBiaoSong-B05S", var(--font-noto-serif-sc), serif;
+  font-family: var(--font-gb-title);
   font-size: 22pt;
   font-weight: bold;
   text-align: center;
@@ -135,7 +143,7 @@
 .doc-mode-simple .document-editor .ProseMirror h1,
 .doc-mode-gb .document-editor .ProseMirror h1,
 .doc-mode-official .document-editor .ProseMirror h1 {
-  font-family: "Times New Roman", "黑体", "SimHei", var(--font-noto-sans-sc), sans-serif;
+  font-family: var(--font-gb-heiti);
   font-size: 16pt;
   line-height: 28pt;
   margin: 0.5em 0 0.25em 0;
@@ -145,7 +153,7 @@
 .doc-mode-simple .document-editor .ProseMirror h2,
 .doc-mode-gb .document-editor .ProseMirror h2,
 .doc-mode-official .document-editor .ProseMirror h2 {
-  font-family: "Times New Roman", "楷体_GB2312", "楷体", "KaiTi", var(--font-noto-serif-sc), serif;
+  font-family: var(--font-gb-kaiti);
   font-size: 16pt;
   line-height: 28pt;
   margin: 0.25em 0;
@@ -155,7 +163,7 @@
 .doc-mode-simple .document-editor .ProseMirror h3,
 .doc-mode-gb .document-editor .ProseMirror h3,
 .doc-mode-official .document-editor .ProseMirror h3 {
-  font-family: "Times New Roman", "仿宋_GB2312", "仿宋", "FangSong", var(--font-noto-serif-sc), serif;
+  font-family: var(--font-gb-fangsong);
   font-size: 16pt;
   font-weight: bold;
   line-height: 28pt;
@@ -166,7 +174,7 @@
 .doc-mode-simple .document-editor .ProseMirror h4,
 .doc-mode-gb .document-editor .ProseMirror h4,
 .doc-mode-official .document-editor .ProseMirror h4 {
-  font-family: "Times New Roman", "仿宋_GB2312", "仿宋", "FangSong", var(--font-noto-serif-sc), serif;
+  font-family: var(--font-gb-fangsong);
   font-size: 16pt;
   font-weight: bold;
   line-height: 28pt;
@@ -177,7 +185,7 @@
 .doc-mode-simple .document-editor .ProseMirror h5,
 .doc-mode-gb .document-editor .ProseMirror h5,
 .doc-mode-official .document-editor .ProseMirror h5 {
-  font-family: "Times New Roman", "仿宋_GB2312", "仿宋", "FangSong", var(--font-noto-serif-sc), serif;
+  font-family: var(--font-gb-fangsong);
   font-size: 16pt;
   line-height: 28pt;
   margin: 0.25em 0;
@@ -204,7 +212,7 @@
   text-align: center;
   vertical-align: middle;
   min-width: 80px;
-  font-family: "仿宋_GB2312", "仿宋", "FangSong", var(--font-noto-serif-sc), serif;
+  font-family: var(--font-gb-fangsong);
   font-size: 16pt;
   color: #000;
 }
@@ -254,7 +262,7 @@
 .doc-mode-simple .document-editor .ProseMirror li,
 .doc-mode-gb .document-editor .ProseMirror li,
 .doc-mode-official .document-editor .ProseMirror li {
-  font-family: "Times New Roman", "仿宋_GB2312", "仿宋", "FangSong", var(--font-noto-serif-sc), serif !important;
+  font-family: var(--font-gb-fangsong) !important;
   font-size: 16pt !important;
   line-height: 28pt !important;
   margin: 0 !important;
@@ -311,7 +319,7 @@
 
 /* ===== 红头样式 ===== */
 .red-header-text {
-  font-family: "方正小标宋简体", "FZXiaoBiaoSong-B05S", var(--font-noto-serif-sc), serif;
+  font-family: var(--font-gb-title);
   font-size: 22pt;
   font-weight: bold;
   color: #c00;
@@ -332,7 +340,7 @@
   border-radius: 50%;
   padding: 8pt 12pt;
   color: #c00;
-  font-family: "楷体_GB2312", "楷体", "KaiTi", var(--font-noto-serif-sc), serif;
+  font-family: var(--font-gb-kaiti);
   font-size: 14pt;
   text-align: center;
 }
@@ -368,7 +376,7 @@
 }
 
 .de-banji-left, .de-banji-right {
-  font-family: "仿宋_GB2312", "仿宋", "FangSong", var(--font-noto-serif-sc), serif;
+  font-family: var(--font-gb-fangsong);
   font-size: 14pt;
   line-height: 1.8;
 }

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { CustomDialog } from "@/components/ui/CustomDialog";
+import { sanitizeGovHtml } from "@/lib/sanitize-gov-html";
 
 interface EditorToolbarProps {
   editor: Editor | null;
@@ -141,7 +142,18 @@ export function EditorToolbar({ editor, onImageUpload }: EditorToolbarProps) {
     },
     {
       items: [
-        { icon: <Pilcrow className="w-4 h-4" />, label: "强制渲染", action: () => editor.chain().focus().clearNodes().unsetAllMarks().run(), isActive: false },
+        {
+          icon: <Pilcrow className="w-4 h-4" />,
+          label: "强制渲染",
+          action: () => {
+            if (!editor) return;
+            // 全选 → 清洗所有行内样式/行内标签 → 重新 setContent，让 CSS 标准格式生效
+            const html = editor.getHTML();
+            const clean = sanitizeGovHtml(html);
+            editor.commands.setContent(clean, { emitUpdate: false });
+          },
+          isActive: false,
+        },
       ],
     },
   ];

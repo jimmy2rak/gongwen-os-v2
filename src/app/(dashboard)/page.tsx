@@ -18,6 +18,7 @@ import { EditorFooterBar } from "@/components/editor/EditorFooterBar";
 import { getAllCategories, getCategoryColor } from "@/types";
 import { buildDocFromTemplate } from "@/lib/template-to-doc";
 import { markdownToGovDocHtml, looksLikeMarkdown } from "@/lib/markdown";
+import { sanitizeGovHtml } from "@/lib/sanitize-gov-html";
 import {
   Save, Download, ChevronDown, Plus, Clock, CheckCircle, AlertTriangle, FileText,
 } from "lucide-react";
@@ -50,8 +51,9 @@ export default function HomePage() {
 
   // 从 Word 导入：识别后载入当前编辑器（作为新文档）
   const handleDocxImport = (data: { html: string; title: string; category: string }) => {
-    store.initDoc({ title: data.title, content: data.html, category: data.category, format: "gb" });
-    editorInstance?.commands.setContent(data.html, { emitUpdate: false });
+    const clean = sanitizeGovHtml(data.html);
+    store.initDoc({ title: data.title, content: clean, category: data.category, format: "gb" });
+    editorInstance?.commands.setContent(clean, { emitUpdate: false });
     setShowDocxImport(false);
     store.setShowNewDocDialog(false);
     showDialog("导入成功", "已从 Word 文档识别内容并载入编辑器，可直接修改");
@@ -184,8 +186,10 @@ export default function HomePage() {
     const replace = localStorage.getItem(replaceKey);
     const title = store.title || "未命名公文";
 
-    const convert = (raw: string) =>
-      looksLikeMarkdown(raw) ? markdownToGovDocHtml(raw, title) : raw;
+    const convert = (raw: string) => {
+      const html = looksLikeMarkdown(raw) ? markdownToGovDocHtml(raw, title) : raw;
+      return sanitizeGovHtml(html);
+    };
 
     if (append) {
       localStorage.removeItem(appendKey);

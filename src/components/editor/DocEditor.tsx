@@ -28,6 +28,7 @@ import { useEffect, useRef } from "react";
 import type { Editor } from "@tiptap/react";
 import type { DocMetaInfo } from "@/types";
 import { looksLikeMarkdown, markdownToGovDocHtml } from "@/lib/markdown";
+import { sanitizeGovHtml } from "@/lib/sanitize-gov-html";
 import { useEditorStore } from "@/stores/editor.store";
 import "./editor.css";
 
@@ -96,40 +97,7 @@ export function DocEditor({
       // 从 AI 对话、网页、Word 复制过来的文字常带 font-family/font-weight/color，
       // 直接粘贴会绕过正文 CSS（仿宋/黑体）显示为粗黑体。此处剥离所有行内样式与
       // 行内格式化标签（span/font/b/strong/i…），仅保留块级结构，让正文回归仿宋。
-      transformPastedHTML: (html: string) => {
-        if (typeof window === "undefined" || !html) return html;
-        try {
-          const doc = new DOMParser().parseFromString(html, "text/html");
-          const stripAttr = (el: Element) => {
-            el.removeAttribute("style");
-            el.removeAttribute("class");
-            el.removeAttribute("align");
-            el.removeAttribute("width");
-            el.removeAttribute("height");
-            el.removeAttribute("bgcolor");
-            el.removeAttribute("color");
-            el.removeAttribute("face");
-            el.removeAttribute("size");
-          };
-          doc.querySelectorAll("*").forEach(stripAttr);
-          // 拆除外层行内格式化标签（保留块级结构），强制变成正文样式
-          const inlineTags = [
-            "SPAN", "FONT", "B", "STRONG", "I", "EM", "U", "S", "STRIKE",
-            "SUB", "SUP", "MARK", "SMALL", "LABEL", "CENTER",
-          ];
-          inlineTags.forEach((tag) => {
-            doc.querySelectorAll(tag).forEach((el) => {
-              const parent = el.parentNode;
-              if (!parent) return;
-              while (el.firstChild) parent.insertBefore(el.firstChild, el);
-              parent.removeChild(el);
-            });
-          });
-          return doc.body.innerHTML;
-        } catch {
-          return html;
-        }
-      },
+      transformPastedHTML: (html: string) => sanitizeGovHtml(html),
     },
   });
 
@@ -142,12 +110,13 @@ export function DocEditor({
     }
   }, [editor, onEditorReady]);
 
-  // 内容变化时更新
+  // 内容变化时更新（外部传入 content 时统一清洗行内样式，确保回归标准公文格式）
   useEffect(() => {
     if (editor && content) {
       const currentHtml = editor.getHTML();
       const isMarkdown = looksLikeMarkdown(content);
-      const targetHtml = isMarkdown ? templateMarkdownToHtml(content) : content;
+      const html = isMarkdown ? templateMarkdownToHtml(content) : content;
+      const targetHtml = sanitizeGovHtml(html);
       if (targetHtml && targetHtml !== currentHtml) {
         editor.commands.setContent(targetHtml);
       }
