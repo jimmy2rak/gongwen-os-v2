@@ -2,12 +2,15 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Wand2, Loader2, X, Settings } from "lucide-react";
 import { getAllCategories } from "@/types";
 import { useGenerate } from "@/lib/ai/use-generate";
 import { GenActions } from "@/components/quick-draft/GenActions";
 import { SkillSelector } from "@/components/quick-draft/SkillSelector";
+import { ReferenceUploader } from "@/components/quick-draft/ReferenceUploader";
+import { buildReferenceContext, fetchKnowledgeContext } from "@/lib/ai/reference-rules";
+import type { ParsedRef } from "@/lib/ai/parse-reference";
 import { markdownToGovDocHtml } from "@/lib/markdown";
 
 export default function QuickPage() {
@@ -17,21 +20,47 @@ export default function QuickPage() {
   const [demand, setDemand] = useState("");
   const [words, setWords] = useState(1500);
   const [skillContext, setSkillContext] = useState("");
+  const [eventItems, setEventItems] = useState<ParsedRef[]>([]);
+  const [styleItems, setStyleItems] = useState<ParsedRef[]>([]);
+  const [useKnowledge, setUseKnowledge] = useState(true);
+  const [knowledgeText, setKnowledgeText] = useState("");
 
   const { options, model, setModel, loading, streaming, text, error, run, cancel } = useGenerate();
+
+  // 引用知识库（已审阅文档）：开启时拉取摘要作为语料/规范参考
+  useEffect(() => {
+    if (!useKnowledge) {
+      setKnowledgeText("");
+      return;
+    }
+    let alive = true;
+    fetchKnowledgeContext()
+      .then((t) => alive && setKnowledgeText(t))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [useKnowledge]);
 
   const effectiveTitle = title.trim() || category;
   const canGenerate = !streaming && !!model && demand.trim().length > 0;
 
   const handleGenerate = () => {
+    const refCtx = buildReferenceContext({
+      eventItems,
+      styleItems,
+      knowledgeText: useKnowledge ? knowledgeText : undefined,
+    });
+    const combined = [skillContext, refCtx].filter(Boolean).join("\n\n");
+    const hasRef = !!refCtx;
     const prompt = `请起草一篇《${category}》公文初稿。
 要求：
 - 标题建议：${effectiveTitle}
 - 篇幅：约 ${words} 字
 - 需求要点：${demand.trim()}
 输出格式要求：请使用 Markdown 格式输出，主标题用 # 开头，各级小标题依次用 ##、###、#### 开头，正文段落之间空一行，列表用 1. 2. 3. 或 - 表示。
-请直接输出公文正文（含合适的小标题与层级结构），严格遵循《党政机关公文格式》(GB/T 9704-2012) 规范，语言庄重、精练、书面化。`;
-    run(prompt, category, skillContext);
+${hasRef ? "（你已通过本页双资料上传区获得【事件参考资料】与【语言结构文风参考资料】，请严格遵循系统固定强制规则，真实复用两份资料的内容与文风生成，禁止凭空编造。）" : ""}请直接输出公文正文（含合适的小标题与层级结构），严格遵循《党政机关公文格式》(GB/T 9704-2012) 规范，语言庄重、精练、书面化。`;
+    run(prompt, category, combined);
   };
 
   return (
@@ -75,6 +104,29 @@ export default function QuickPage() {
               className="mt-1 w-full text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-red-300"
             />
           </label>
+
+          {/* 双资料上传区：事件参考资料 / 语言结构文风参考资料 */}
+          <div className="space-y-3">
+            <ReferenceUploader
+              title="事件参考资料上传区"
+              hint="可上传本次公文对应的事件素材、通知、原始文件、汇报材料、背景资料，AI 将读取真实事件内容、事实数据、事件经过、关键信息用于写稿。"
+              onChange={setEventItems}
+            />
+            <ReferenceUploader
+              title="语言结构文风参考资料上传区"
+              hint="可上传单位过往范文、模板、标准公文、同类稿件，AI 将学习你的固定行文结构、段落布局、官方话术、措辞风格、句式结构统一复刻。"
+              onChange={setStyleItems}
+            />
+            <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={useKnowledge}
+                onChange={(e) => setUseKnowledge(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              同时引用知识库（已审阅文档）
+            </label>
+          </div>
 
           <label className="block">
             <span className="text-xs text-gray-500">目标字数</span>
