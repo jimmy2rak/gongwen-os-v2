@@ -3,16 +3,17 @@
 """
 人民日报 · 理论版+评论版 · 当日自动爬虫（第二版）
 =================================================
-内置密钥，无需 export 环境变量，Deepnote / 终端直接跑。
+需通过环境变量提供爬虫入库密钥后运行（密钥不再硬编码于源码）。
 
 依赖：pip install requests beautifulsoup4
 运行：
+  export CRAWLER_API_KEY=your_key
+  export BACKEND_URL=https://your-domain.xyz   # 可选，默认生产域名
   python3 crawl_rmrb_today.py             # 直接爬取并入库
   python3 crawl_rmrb_today.py --dry-run   # 仅预览不写入
 
-如需覆盖密钥或后端地址，设环境变量即可（优先于内置值）：
-  export CRAWLER_API_KEY=your_key
-  export BACKEND_URL=https://your-domain.xyz
+安全说明：CRAWLER_API_KEY 用于 X-Crawler-Auth 鉴权，请通过环境变量注入，
+切勿将真实密钥写入源码或提交到仓库（本文件已移除内置密钥）。
 """
 
 import os
@@ -24,12 +25,13 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
-# ── 内置配置（Deepnote/终端直接可用，环境变量优先）────
-_CRAWLER_API_KEY = "gw_crawler_9858de6414cd6114e4ae60b07d170329"
+# ── 内置配置（后端地址可环境变量覆盖；密钥仅来自环境变量）────
 _BACKEND_URL = "https://gongwenos.182183.xyz"
 
 BACKEND_URL = (os.environ.get("BACKEND_URL") or _BACKEND_URL).rstrip("/")
-API_KEY = os.environ.get("CRAWLER_API_KEY") or _CRAWLER_API_KEY
+API_KEY = os.environ.get("CRAWLER_API_KEY", "")
+if not API_KEY:
+    raise SystemExit("❌ 未设置环境变量 CRAWLER_API_KEY，请先 export 后再运行（密钥不内置）")
 UPLOAD_URL = f"{BACKEND_URL}/api/public/crawler/upload"
 SOURCE_NAME = "人民日报"
 COLUMN_ID = "人民日报"  # 前端板块名

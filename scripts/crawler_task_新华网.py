@@ -18,11 +18,15 @@ import requests
 from bs4 import BeautifulSoup
 
 # ═══════════════════ 后端注入参数（请勿手动修改） ═════════════════
-API_KEY = "gw_crawler_9858de6414cd6114e4ae60b07d170329"                        # X-Crawler-Auth 鉴权密钥（后端注入）
-UPLOAD_BACKEND_URL = "https://gongwenos.182183.xyz/api/public/crawler/upload"  # 入库接口地址（后端注入）
+# 爬虫入库密钥通过环境变量 CRAWLER_API_KEY 注入（密钥不硬编码于源码）。
+API_KEY = os.environ.get("CRAWLER_API_KEY", "")
+UPLOAD_BACKEND_URL = os.environ.get("CRAWLER_UPLOAD_URL") or "https://gongwenos.182183.xyz/api/public/crawler/upload"  # 入库接口地址（后端注入）
 BIND_SOURCE_ID = "cNewsXhll01"            # 绑定爬虫数据源 ID（后端注入）
 BIND_COLUMN_ID = ""                       # 绑定公文栏目 ID（后端注入）
 # ══════════════════════════════════════════════════════════════════
+
+if not API_KEY:
+    raise SystemExit("❌ 未设置环境变量 CRAWLER_API_KEY，请通过环境变量注入密钥后再运行（密钥不内置）")
 
 # ── 站点配置（后端注入）──
 SITE_NAME = "新华网"
