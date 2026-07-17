@@ -1,22 +1,43 @@
 // ─── 底部状态栏 ──────────────────────────────────
-// 显示字数统计、保存状态、纸面缩放
+// 显示字数统计、保存状态（含保存时间）、纸面缩放
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HelpCircle, CheckCircle, Clock, ZoomIn } from "lucide-react";
 
 interface EditorFooterBarProps {
   content: string;
   saved: boolean;
+  /** 最近一次成功保存的时间戳（ms），无则传 null/undefined */
+  savedAt?: number | null;
   zoom?: number;
   onZoomChange?: (zoom: number) => void;
 }
 
-export function EditorFooterBar({ content, saved, zoom = 100, onZoomChange }: EditorFooterBarProps) {
+/** 格式化保存时间：今天只显示 HH:mm；非今天显示 YYYY.M.D  HH:mm */
+function formatSaveTime(ts: number): string {
+  const d = new Date(ts);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const now = new Date();
+  const isToday =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (isToday) return `${hh}:${mm}`;
+  return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}\u00A0\u00A0${hh}:${mm}`;
+}
+
+export function EditorFooterBar({ content, saved, savedAt, zoom = 100, onZoomChange }: EditorFooterBarProps) {
   const [editingZoom, setEditingZoom] = useState(false);
   const [zoomInput, setZoomInput] = useState(String(Math.round(zoom)));
   const [showHelp, setShowHelp] = useState(false);
+  // 设备识别：避免 SSR  hydration 不一致，挂载后再判定
+  const [isMac, setIsMac] = useState(false);
+  useEffect(() => {
+    setIsMac(/Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent || ""));
+  }, []);
 
   // 计算字数（去 HTML 标签）
   const wordCount = useMemo(() => {
@@ -39,9 +60,28 @@ export function EditorFooterBar({ content, saved, zoom = 100, onZoomChange }: Ed
     setEditingZoom(false);
   };
 
+  const saveTimeText = savedAt ? formatSaveTime(savedAt) : "";
+
+  // 快捷键清单（按设备给出对应按键）
+  const shortcutRows = isMac
+    ? [
+        { keys: "⌘ + S", label: "保存" },
+        { keys: "⌘ + N", label: "新建文档" },
+        { keys: "⌘ + Z", label: "撤销" },
+        { keys: "⌘ + ⇧ + Z", label: "重做" },
+        { keys: "⌘ + 滚轮", label: "缩放" },
+      ]
+    : [
+        { keys: "Ctrl + S", label: "保存" },
+        { keys: "Ctrl + N", label: "新建文档" },
+        { keys: "Ctrl + Z", label: "撤销" },
+        { keys: "Ctrl + Shift + Z", label: "重做" },
+        { keys: "Ctrl + 滚轮", label: "缩放" },
+      ];
+
   return (
     <div className="flex items-center justify-between px-4 py-1.5 bg-white border-t border-gray-200 text-[11px] text-gray-500">
-      {/* 左侧：字数 + 保存状态 */}
+      {/* 左侧：字数 + 保存状态 + 保存时间 */}
       <div className="flex items-center gap-4">
         <span>字数：{wordCount}</span>
         <span className="flex items-center gap-1">
@@ -49,6 +89,12 @@ export function EditorFooterBar({ content, saved, zoom = 100, onZoomChange }: Ed
             <><CheckCircle className="w-3 h-3 text-green-500" /> 已保存</>
           ) : (
             <><Clock className="w-3 h-3 text-amber-500" /> 未保存</>
+          )}
+          {savedAt && (
+            <span className="text-gray-400">
+              {" · "}
+              {saved ? saveTimeText : `上次 ${saveTimeText}`}
+            </span>
           )}
         </span>
       </div>
@@ -86,12 +132,17 @@ export function EditorFooterBar({ content, saved, zoom = 100, onZoomChange }: Ed
           </button>
           {showHelp && (
             <div className="absolute bottom-full right-0 mb-2 w-56 p-3 bg-gray-800 rounded-lg shadow-lg z-50 text-[10px] text-gray-300">
-              <strong className="block text-white mb-2">快捷键说明</strong>
-              <span className="block mb-1"><kbd className="px-1 bg-gray-700 rounded text-gray-300">Ctrl+S</kbd> 保存</span>
-              <span className="block mb-1"><kbd className="px-1 bg-gray-700 rounded text-gray-300">Ctrl+N</kbd> 新建文档</span>
-              <span className="block mb-1"><kbd className="px-1 bg-gray-700 rounded text-gray-300">Ctrl+Z</kbd> 撤销</span>
-              <span className="block mb-1"><kbd className="px-1 bg-gray-700 rounded text-gray-300">Ctrl+Shift+Z</kbd> 重做</span>
-              <span className="block"><kbd className="px-1 bg-gray-700 rounded text-gray-300">Ctrl+滚轮</kbd> 缩放</span>
+              <strong className="block text-white mb-1">
+                快捷键说明{isMac ? "（macOS）" : "（Windows）"}
+              </strong>
+              <span className="block mb-2 text-gray-400">
+                {isMac ? "当前设备：Mac" : "当前设备：Windows / 其他"}
+              </span>
+              {shortcutRows.map((row) => (
+                <span key={row.keys} className="block mb-1">
+                  <kbd className="px-1 bg-gray-700 rounded text-gray-300">{row.keys}</kbd> {row.label}
+                </span>
+              ))}
             </div>
           )}
         </div>

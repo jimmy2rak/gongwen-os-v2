@@ -574,6 +574,7 @@ export default function HomePage() {
             <EditorFooterBar
               content={store.content}
               saved={!store.isDirty}
+              savedAt={store.lastSavedAt}
               zoom={store.zoom}
               onZoomChange={store.setZoom}
             />
