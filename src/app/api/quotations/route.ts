@@ -11,6 +11,26 @@ function unauthorized() {
   return NextResponse.json({ success: false, error: { code: "UNAUTHORIZED", message: "未登录" } }, { status: 401 });
 }
 
+function parseCategories(raw: string | null | undefined): string[] {
+  const v = String(raw || "").trim();
+  if (!v) return [];
+  if (v.startsWith("[")) {
+    try { return JSON.parse(v); } catch { return v ? [v] : []; }
+  }
+  return [v];
+}
+
+function serializeCategories(category?: string | string[] | null): string {
+  const arr = normalizeCategories(category);
+  return arr.length ? JSON.stringify(arr) : "";
+}
+
+function normalizeCategories(category?: string | string[] | null): string[] {
+  if (!category) return [];
+  if (Array.isArray(category)) return category.map((c) => c.trim()).filter(Boolean);
+  return category.split(/[,，]/).map((c) => c.trim()).filter(Boolean);
+}
+
 export async function GET(req: NextRequest) {
   const user = await getServerUser();
   if (!user) return unauthorized();
@@ -30,7 +50,7 @@ export async function GET(req: NextRequest) {
       sourceType: String(r.source_type || "manual"),
       sourceId: String(r.source_id || ""),
       sourceTitle: String(r.source_title || ""),
-      category: String(r.category || ""),
+      category: parseCategories(String(r.category || "")),
       createdAt: Number(r.created_at),
       updatedAt: Number(r.updated_at),
     }));
@@ -57,9 +77,10 @@ export async function DELETE(req: NextRequest) {
 
 // PATCH: 批量/单条修改分类。
 // 支持三种载荷：
-//   { items: [{id, category}, ...] }  —— AI 一键分类保存
-//   { ids: [...], category }          —— 批量设为同一分类
-//   { id, category }                  —— 单条改分类
+//   { items: [{id, categories: string[]}, ...] }  —— AI 一键分类保存（categories 为数组）
+//   { items: [{id, category: string}, ...] }      —— 兼容旧单分类
+//   { ids: [...], categories: string[] }           —— 批量设为同一组分类
+//   { id, categories: string[] }                   —— 单条改分类
 export async function PATCH(req: NextRequest) {
   const user = await getServerUser();
   if (!user) return unauthorized();
@@ -68,15 +89,22 @@ export async function PATCH(req: NextRequest) {
   const now = Math.floor(Date.now() / 1000);
   try {
     let updates: { id: string; category: string }[] = [];
+    const extractCategories = (it: any): string[] => {
+      if (Array.isArray(it.categories)) return it.categories.filter((x: any) => typeof x === "string");
+      if (typeof it.category === "string") return [it.category];
+      if (Array.isArray(it.category)) return it.category.filter((x: any) => typeof x === "string");
+      return [];
+    };
     if (Array.isArray(body.items)) {
       updates = body.items
         .filter((it: any) => it && typeof it.id === "string")
-        .map((it: any) => ({ id: it.id, category: typeof it.category === "string" ? it.category : "" }));
+        .map((it: any) => ({ id: it.id, category: serializeCategories(extractCategories(it)) }));
     } else if (Array.isArray(body.ids)) {
-      const category = typeof body.category === "string" ? body.category : "";
-      updates = body.ids.filter((x: any) => typeof x === "string").map((id: string) => ({ id, category }));
+      const cats = Array.isArray(body.categories) ? body.categories.filter((x: any) => typeof x === "string") : [];
+      updates = body.ids.filter((x: any) => typeof x === "string").map((id: string) => ({ id, category: serializeCategories(cats) }));
     } else if (typeof body.id === "string") {
-      updates = [{ id: body.id, category: typeof body.category === "string" ? body.category : "" }];
+      const cats = Array.isArray(body.categories) ? body.categories.filter((x: any) => typeof x === "string") : [];
+      updates = [{ id: body.id, category: serializeCategories(cats) }];
     }
     if (updates.length === 0) {
       return NextResponse.json({ success: false, error: { message: "缺少要更新的金句" } }, { status: 400 });
@@ -104,7 +132,7 @@ export async function POST(req: NextRequest) {
   const sourceType = typeof body.sourceType === "string" ? body.sourceType : "manual";
   const sourceId = typeof body.sourceId === "string" ? body.sourceId : "";
   const sourceTitle = typeof body.sourceTitle === "string" ? body.sourceTitle : "";
-  const category = typeof body.category === "string" ? body.category : "";
+  const category = serializeCategories(Array.isArray(body.category) ? body.category : typeof body.category === "string" ? body.category : undefined);
   const now = Math.floor(Date.now() / 1000);
   const id = `q${nanoid(12)}`;
   try {
@@ -114,7 +142,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({
       success: true,
-      data: { id, content, sourceType, sourceId, sourceTitle, category, createdAt: now, updatedAt: now },
+      data: { id, content, sourceType, sourceId, sourceTitle, category: parseCategories(category), createdAt: now, updatedAt: now },
     });
   } catch (e) {
     console.error("[quotations POST]", e);

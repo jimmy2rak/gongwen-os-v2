@@ -8,7 +8,14 @@ export interface AddQuotePayload {
   sourceType: string;
   sourceId?: string;
   sourceTitle?: string;
-  category?: string;
+  category?: string | string[];
+}
+
+/** 把可能存在的单字符串/逗号分隔/数组统一成字符串数组 */
+function normalizeCategories(category?: string | string[] | null): string[] {
+  if (!category) return [];
+  if (Array.isArray(category)) return category.map((c) => c.trim()).filter(Boolean);
+  return category.split(/[,，]/).map((c) => c.trim()).filter(Boolean);
 }
 
 /** 金句 hook：按 sourceId 拉取（不传则拉全部），支持新增 / 删除 */
@@ -65,13 +72,13 @@ export function useQuotations(sourceId?: string) {
   }, []);
 
   /** 单条改分类（乐观更新本地状态） */
-  const setQuoteCategory = useCallback(async (id: string, category: string) => {
-    setQuotes((q) => q.map((x) => (x.id === id ? { ...x, category } : x)));
+  const setQuoteCategory = useCallback(async (id: string, categories: string[]) => {
+    setQuotes((q) => q.map((x) => (x.id === id ? { ...x, category: categories } : x)));
     try {
       const r = await fetch("/api/quotations", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, category }),
+        body: JSON.stringify({ id, categories }),
       });
       return await r.json();
     } catch (e) {
@@ -79,17 +86,17 @@ export function useQuotations(sourceId?: string) {
     }
   }, []);
 
-  /** 批量保存分类建议（AI 一键分类）：items=[{id, category}] */
-  const applyCategories = useCallback(async (items: { id: string; category: string }[]) => {
+  /** 批量保存分类建议（AI 一键分类）：items=[{id, categories: string[]}] */
+  const applyCategories = useCallback(async (items: { id: string; categories: string[] }[]) => {
     try {
       const r = await fetch("/api/quotations", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({ items: items.map((it) => ({ id: it.id, categories: it.categories })) }),
       });
       const b = await r.json();
       if (b.success) {
-        const map = new Map(items.map((it) => [it.id, it.category]));
+        const map = new Map(items.map((it) => [it.id, it.categories]));
         setQuotes((q) => q.map((x) => (map.has(x.id) ? { ...x, category: map.get(x.id)! } : x)));
       }
       return b;

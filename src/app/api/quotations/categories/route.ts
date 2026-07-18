@@ -16,6 +16,15 @@ function unauthorized() {
   return NextResponse.json({ success: false, error: { code: "UNAUTHORIZED", message: "未登录" } }, { status: 401 });
 }
 
+function parseCategories(raw: string | null | undefined): string[] {
+  const v = String(raw || "").trim();
+  if (!v) return [];
+  if (v.startsWith("[")) {
+    try { return JSON.parse(v); } catch { return v ? [v] : []; }
+  }
+  return [v];
+}
+
 async function ensureTable() {
   await client.execute({
     sql: `CREATE TABLE IF NOT EXISTS quote_categories (
@@ -39,18 +48,21 @@ export async function GET() {
       args: [user.id],
     });
     const rows = (res.rows as any[]) || [];
-    // 各分类金句数量
-    const cntRes = await client.execute({
-      sql: `SELECT category AS cat, COUNT(*) AS n FROM quotations WHERE user_id = ? AND category <> '' GROUP BY category`,
+    // 读取所有金句，按分类数组计数（一条金句可属多个分类）
+    const qRes = await client.execute({
+      sql: `SELECT category FROM quotations WHERE user_id = ?`,
       args: [user.id],
     });
-    const cntMap: Record<string, number> = {};
-    for (const r of (cntRes.rows as any[]) || []) cntMap[String(r.cat)] = Number(r.n);
+    const catCounts: Record<string, number> = {};
+    for (const r of (qRes.rows as any[]) || []) {
+      const cats = parseCategories(String(r.category || ""));
+      for (const c of cats) catCounts[c] = (catCounts[c] || 0) + 1;
+    }
     const data = rows.map((r) => ({
       id: String(r.id),
       name: String(r.name),
       color: String(r.color || ""),
-      count: cntMap[String(r.name)] || 0,
+      count: catCounts[String(r.name)] || 0,
       createdAt: Number(r.created_at),
     }));
     return NextResponse.json({ success: true, data });
@@ -109,12 +121,23 @@ export async function DELETE(req: NextRequest) {
     } else if (name) {
       await client.execute({ sql: `DELETE FROM quote_categories WHERE name = ? AND user_id = ?`, args: [name, user.id] });
     }
-    // 把该分类下金句的 category 清空（不删金句）
+    // 把该分类从所有金句的 category 数组中移除（不删金句）
     if (catName) {
-      await client.execute({
-        sql: `UPDATE quotations SET category = '', updated_at = ? WHERE user_id = ? AND category = ?`,
-        args: [Math.floor(Date.now() / 1000), user.id, catName],
+      const qRes = await client.execute({
+        sql: `SELECT id, category FROM quotations WHERE user_id = ?`,
+        args: [user.id],
       });
+      const now = Math.floor(Date.now() / 1000);
+      for (const r of (qRes.rows as any[]) || []) {
+        const cats = parseCategories(String(r.category || ""));
+        if (cats.includes(catName)) {
+          const newCats = cats.filter((c) => c !== catName);
+          await client.execute({
+            sql: `UPDATE quotations SET category = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+            args: [newCats.length ? JSON.stringify(newCats) : "", now, String(r.id), user.id],
+          });
+        }
+      }
     }
     return NextResponse.json({ success: true });
   } catch (e) {

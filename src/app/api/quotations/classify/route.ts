@@ -17,6 +17,15 @@ export const dynamic = "force-dynamic";
 
 const MAX_QUOTES = 80;
 
+function parseCategories(raw: string | null | undefined): string[] {
+  const v = String(raw || "").trim();
+  if (!v) return [];
+  if (v.startsWith("[")) {
+    try { return JSON.parse(v); } catch { return v ? [v] : []; }
+  }
+  return [v];
+}
+
 export async function POST(req: NextRequest) {
   const user = await getServerUser();
   if (!user) return NextResponse.json({ success: false, error: { message: "未登录" } }, { status: 401 });
@@ -80,10 +89,12 @@ export async function POST(req: NextRequest) {
       .filter((p) => byId.has(p.id))
       .map((p) => {
         const q = byId.get(p.id)!;
-        return { id: q.id, content: q.content, sourceTitle: q.sourceTitle, oldCategory: q.category, category: (p.category || "").trim() };
+        return { id: q.id, content: q.content, sourceTitle: q.sourceTitle, oldCategories: parseCategories(q.category), categories: p.categories };
       });
     // 汇总建议出现的新分类（不在已有清单中的）
-    const newCats = Array.from(new Set(suggestions.map((s) => s.category).filter((c) => c && !categories.includes(c))));
+    const newCats = Array.from(
+      new Set(suggestions.flatMap((s) => s.categories).filter((c) => c && !categories.includes(c)))
+    );
     return NextResponse.json({ success: true, suggestions, newCategories: newCats, existingCategories: categories });
   } catch (e) {
     console.error("[classify] 调用模型失败:", e);
@@ -97,18 +108,18 @@ function buildPrompt(quotes: { id: string; content: string }[], categories: stri
     : `目前没有已有分类，请你归纳出简洁、通用的分类。`;
   const list = quotes.map((q) => `[id=${q.id}] ${q.content}`).join("\n");
   return (
-    `你是资深中文党政机关公文写作助手。请为下列"金句"逐条归类。\n` +
+    `你是资深中文党政机关公文写作助手。请为下列"金句"逐条归类，允许一条金句同时属于多个分类。\n` +
     `${catLine}\n` +
     `分类规则：\n` +
     `1. 优先使用已有分类；确有必要才新增分类。\n` +
     `2. 分类名简洁规范（2-6 个汉字），如"党的政策""工作作风""乡村振兴""基层治理""担当作为""为民服务"等。\n` +
-    `3. 每条金句只归入一个最贴切的分类。\n\n` +
+    `3. 一条金句可以归入多个贴切的分类；若没有合适分类，可返回空数组。\n\n` +
     `金句列表：\n${list}\n\n` +
-    `请严格只输出一个 JSON 数组，每个元素形如 {"id":"金句id","category":"分类名"}，不要输出任何解释或 Markdown 围栏。`
+    `请严格只输出一个 JSON 数组，每个元素形如 {"id":"金句id","categories":["分类名1","分类名2"]}，不要输出任何解释或 Markdown 围栏。`
   );
 }
 
-function parseAssignments(text: string): { id: string; category: string }[] | null {
+function parseAssignments(text: string): { id: string; categories: string[] }[] | null {
   try {
     const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
     let s = fence ? fence[1].trim() : text.trim();
@@ -119,7 +130,17 @@ function parseAssignments(text: string): { id: string; category: string }[] | nu
     if (!Array.isArray(arr)) return null;
     return arr
       .filter((x: any) => x && typeof x.id === "string")
-      .map((x: any) => ({ id: x.id, category: typeof x.category === "string" ? x.category : "" }));
+      .map((x: any) => {
+        let cats: string[] = [];
+        if (Array.isArray(x.categories)) {
+          cats = x.categories.filter((c: any) => typeof c === "string").map((c: string) => c.trim());
+        } else if (typeof x.category === "string") {
+          cats = [x.category.trim()];
+        } else if (Array.isArray(x.category)) {
+          cats = x.category.filter((c: any) => typeof c === "string").map((c: string) => c.trim());
+        }
+        return { id: x.id, categories: cats };
+      });
   } catch {
     return null;
   }

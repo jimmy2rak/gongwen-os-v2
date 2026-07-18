@@ -1,17 +1,18 @@
 // ─── 金句库视图 ───────────────────────────────────
 // 特性：
 //  1. 按来源文章归口成「一级文章展开菜单」，默认全部展开。
-//  2. 分类 tab（全部 + 用户自定义分类）过滤；「全部」下按文章归口展示全部金句。
-//  3. 每条金句卡片：日期左侧显示分类小标签；点击标签可就地改分类。
-//  4. AI 一键分类：调用 /api/quotations/classify 得到建议 → 预览弹窗可微调 → 保存。
+//  2. 分类 tab（全部 + 未分类 + 用户自定义分类）过滤。
+//  3. 每条金句卡片：日期左侧显示多个分类小标签；点击标签可就地多选改分类。
+//  4. AI 一键分类：调用 /api/quotations/classify 得到建议 → 预览弹窗可勾选/微调 → 保存。
 //  5. 自定义分类管理：新建 / 删除分类。
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Quote as QuoteIcon, FileText, Trash2, MapPin, ChevronDown, ChevronRight,
-  Sparkles, Tag, Plus, X, Loader2, Check, Settings2,
+  Sparkles, Tag, Plus, X, Loader2, Check, Settings2, Square, CheckSquare,
 } from "lucide-react";
 import type { Quote } from "@/lib/quotations/types";
 import { useQuoteCategories, categoryColor } from "@/lib/quotations/use-categories";
@@ -21,8 +22,8 @@ interface Props {
   loading: boolean;
   onDelete: (id: string) => void;
   onLocate: (q: Quote) => void;
-  onSetCategory: (id: string, category: string) => Promise<any>;
-  onApplyCategories: (items: { id: string; category: string }[]) => Promise<any>;
+  onSetCategory: (id: string, categories: string[]) => Promise<any>;
+  onApplyCategories: (items: { id: string; categories: string[] }[]) => Promise<any>;
   onReloadQuotes: () => void;
   showToast: (type: "success" | "error", msg: string) => void;
 }
@@ -31,8 +32,8 @@ interface Suggestion {
   id: string;
   content: string;
   sourceTitle: string;
-  oldCategory: string;
-  category: string;
+  oldCategories: string[];
+  categories: string[];
 }
 
 const NO_SOURCE_KEY = "__manual__";
@@ -44,6 +45,7 @@ export function QuoteLibrary({
   const [activeCat, setActiveCat] = useState<string>(""); // "" = 全部
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({}); // 默认全展开，仅记录被折叠的
   const [editingId, setEditingId] = useState<string | null>(null); // 正在就地改分类的金句
+  const [editAnchor, setEditAnchor] = useState<DOMRect | null>(null);
 
   // 分类管理弹窗
   const [manageOpen, setManageOpen] = useState(false);
@@ -58,13 +60,13 @@ export function QuoteLibrary({
   const catNames = categories.map((c) => c.name);
 
   // 未分类数量
-  const uncategorizedCount = quotes.filter((q) => !q.category).length;
+  const uncategorizedCount = useMemo(() => quotes.filter((q) => q.category.length === 0).length, [quotes]);
 
   // 当前 tab 过滤后的金句
   const filtered = useMemo(() => {
     if (!activeCat) return quotes;
-    if (activeCat === "__uncat__") return quotes.filter((q) => !q.category);
-    return quotes.filter((q) => q.category === activeCat);
+    if (activeCat === "__uncat__") return quotes.filter((q) => q.category.length === 0);
+    return quotes.filter((q) => q.category.includes(activeCat));
   }, [quotes, activeCat]);
 
   // 按来源文章归口
@@ -83,7 +85,6 @@ export function QuoteLibrary({
       }
       map.get(key)!.items.push(q);
     }
-    // 按组内最新金句时间倒序
     return Array.from(map.values()).sort((a, b) => {
       const ta = Math.max(...a.items.map((x) => x.createdAt));
       const tb = Math.max(...b.items.map((x) => x.createdAt));
@@ -106,7 +107,13 @@ export function QuoteLibrary({
       });
       const b = await r.json();
       if (b.success) {
-        setSuggestions(b.suggestions || []);
+        setSuggestions((b.suggestions || []).map((s: any) => ({
+          id: s.id,
+          content: s.content,
+          sourceTitle: s.sourceTitle,
+          oldCategories: Array.isArray(s.oldCategories) ? s.oldCategories : [],
+          categories: Array.isArray(s.categories) ? s.categories : [],
+        })));
         setAiNewCats(b.newCategories || []);
       } else {
         showToast("error", b.error?.message || "AI 分类失败");
@@ -120,21 +127,31 @@ export function QuoteLibrary({
     }
   };
 
-  const changeSuggestion = (id: string, category: string) => {
-    setSuggestions((s) => s.map((x) => (x.id === id ? { ...x, category } : x)));
+  const toggleSuggestionCategory = (id: string, category: string, checked: boolean) => {
+    setSuggestions((s) => s.map((x) => {
+      if (x.id !== id) return x;
+      const set = new Set(x.categories);
+      if (checked) set.add(category);
+      else set.delete(category);
+      return { ...x, categories: Array.from(set) };
+    }));
   };
 
   const saveSuggestions = async () => {
     setSaving(true);
     try {
       // 先落地建议中出现的新分类，方便后续 tab 中出现
-      const finalCats = Array.from(new Set(suggestions.map((s) => s.category).filter(Boolean)));
+      const finalCats = Array.from(new Set(suggestions.flatMap((s) => s.categories)));
       const toCreate = finalCats.filter((c) => !catNames.includes(c));
       for (const c of toCreate) await addCategory(c);
       // 只保存有变化的
       const items = suggestions
-        .filter((s) => (s.category || "") !== (s.oldCategory || ""))
-        .map((s) => ({ id: s.id, category: s.category }));
+        .filter((s) => {
+          const a = [...s.categories].sort();
+          const b = [...s.oldCategories].sort();
+          return JSON.stringify(a) !== JSON.stringify(b);
+        })
+        .map((s) => ({ id: s.id, categories: s.categories }));
       if (items.length > 0) {
         const b = await onApplyCategories(items);
         if (!b.success) { showToast("error", "保存失败"); setSaving(false); return; }
@@ -148,10 +165,17 @@ export function QuoteLibrary({
   };
 
   // ── 就地改分类 ──
-  const handleSetCategory = async (id: string, cat: string) => {
+  const handleSetCategory = async (id: string, cats: string[]) => {
     setEditingId(null);
-    await onSetCategory(id, cat);
+    setEditAnchor(null);
+    await onSetCategory(id, cats);
     await reloadCats();
+  };
+
+  const startEdit = (id: string, e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setEditAnchor(rect);
+    setEditingId(id);
   };
 
   if (loading) return <div className="text-center py-16 text-sm text-gray-400">加载中...</div>;
@@ -229,24 +253,26 @@ export function QuoteLibrary({
                             onClick={() => onLocate(q)} title="点击定位到原文档">
                             “{q.content}”
                           </div>
-                          <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400 flex-wrap relative">
-                            {/* 日期左侧的分类小标签（可点击改分类） */}
-                            {editingId === q.id ? (
+                          <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400 flex-wrap">
+                            {/* 分类小标签（可点击改分类） */}
+                            <button onClick={(e) => startEdit(q.id, e)} title="点击修改分类"
+                              className="flex items-center gap-0.5 rounded px-1.5 py-0.5 hover:opacity-80 transition-opacity"
+                              style={q.category.length
+                                ? { backgroundColor: `${categoryColor(q.category[0], categories.find((c) => c.name === q.category[0])?.color)}18`, color: categoryColor(q.category[0], categories.find((c) => c.name === q.category[0])?.color) }
+                                : { backgroundColor: "#f3f4f6", color: "#9ca3af" }}>
+                              <Tag className="w-2.5 h-2.5" />
+                              {q.category.length > 0 ? (
+                                <span className="max-w-[8rem] truncate">{q.category.join(" / ")}</span>
+                              ) : "未分类"}
+                            </button>
+                            {editingId === q.id && editAnchor && (
                               <CategoryPicker
                                 current={q.category}
                                 categories={catNames}
-                                onPick={(c) => handleSetCategory(q.id, c)}
-                                onClose={() => setEditingId(null)}
+                                anchorRect={editAnchor}
+                                onPick={(cats) => handleSetCategory(q.id, cats)}
+                                onClose={() => { setEditingId(null); setEditAnchor(null); }}
                               />
-                            ) : (
-                              <button onClick={() => setEditingId(q.id)} title="点击修改分类"
-                                className="flex items-center gap-0.5 rounded px-1.5 py-0.5 hover:opacity-80 transition-opacity"
-                                style={q.category
-                                  ? { backgroundColor: `${categoryColor(q.category, categories.find((c) => c.name === q.category)?.color)}18`, color: categoryColor(q.category, categories.find((c) => c.name === q.category)?.color) }
-                                  : { backgroundColor: "#f3f4f6", color: "#9ca3af" }}>
-                                <Tag className="w-2.5 h-2.5" />
-                                {q.category || "未分类"}
-                              </button>
                             )}
                             <span>{new Date(q.createdAt * 1000).toLocaleDateString("zh-CN")}</span>
                           </div>
@@ -297,7 +323,7 @@ export function QuoteLibrary({
           suggestions={suggestions}
           newCats={aiNewCats}
           existingCats={catNames}
-          onChange={changeSuggestion}
+          onToggle={toggleSuggestionCategory}
           onClose={() => setAiOpen(false)}
           onSave={saveSuggestions}
         />
@@ -306,29 +332,58 @@ export function QuoteLibrary({
   );
 }
 
-// ── 就地分类选择器（下拉） ──
-function CategoryPicker({ current, categories, onPick, onClose }: {
-  current: string; categories: string[]; onPick: (c: string) => void; onClose: () => void;
+// ── 就地分类多选选择器（Portal + fixed，避免被父容器裁剪） ──
+function CategoryPicker({ current, categories, onPick, onClose, anchorRect }: {
+  current: string[];
+  categories: string[];
+  onPick: (cats: string[]) => void;
+  onClose: () => void;
+  anchorRect: DOMRect;
 }) {
-  return (
+  const [selected, setSelected] = useState<Set<string>>(new Set(current));
+  useEffect(() => { setSelected(new Set(current)); }, [current]);
+
+  const toggle = (c: string) => {
+    const next = new Set(selected);
+    if (next.has(c)) next.delete(c);
+    else next.add(c);
+    setSelected(next);
+  };
+
+  const left = Math.min(anchorRect.left, (typeof window !== "undefined" ? window.innerWidth : 800) - 200);
+  const top = anchorRect.bottom + 6;
+  const maxHeight = typeof window !== "undefined" ? Math.max(180, window.innerHeight - top - 24) : 240;
+
+  return createPortal(
     <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute z-50 top-5 left-0 w-40 max-h-56 overflow-auto bg-white border border-gray-200 rounded-lg shadow-lg py-1">
-        <button onClick={() => onPick("")}
-          className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-1.5 ${!current ? "text-amber-600 font-medium" : "text-gray-500"}`}>
-          {!current && <Check className="w-3 h-3" />} 未分类
-        </button>
-        {categories.length === 0 && (
-          <div className="px-3 py-2 text-[10px] text-gray-300">暂无分类，请先「自定义分类」</div>
-        )}
-        {categories.map((c) => (
-          <button key={c} onClick={() => onPick(c)}
-            className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-1.5 ${current === c ? "text-amber-600 font-medium" : "text-gray-600"}`}>
-            {current === c && <Check className="w-3 h-3" />} {c}
-          </button>
-        ))}
+      <div className="fixed inset-0 z-[90]" onClick={onClose} />
+      <div
+        className="fixed z-[100] w-44 bg-white border border-gray-200 rounded-lg shadow-xl py-1 flex flex-col"
+        style={{ top, left, maxHeight }}
+      >
+        <div className="px-3 py-1.5 text-[10px] text-gray-400 border-b border-gray-100">选择分类（可多选）</div>
+        <div className="overflow-auto flex-1">
+          {categories.length === 0 && (
+            <div className="px-3 py-2 text-[10px] text-gray-300">暂无分类，请先「自定义分类」</div>
+          )}
+          {categories.map((c) => {
+            const checked = selected.has(c);
+            return (
+              <button key={c} onClick={() => toggle(c)}
+                className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-2 text-gray-600">
+                {checked ? <CheckSquare className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" /> : <Square className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />}
+                {c}
+              </button>
+            );
+          })}
+        </div>
+        <div className="border-t border-gray-100 p-2 flex gap-2 bg-white">
+          <button onClick={onClose} className="flex-1 py-1 text-[10px] text-gray-500 hover:bg-gray-100 rounded">取消</button>
+          <button onClick={() => onPick(Array.from(selected))} className="flex-1 py-1 text-[10px] bg-amber-500 text-white rounded hover:bg-amber-600">确定</button>
+        </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 
@@ -382,33 +437,26 @@ function CategoryManageDialog({ categories, onClose, onAdd, onDelete }: {
               ))}
             </div>
           )}
-          <p className="text-[10px] text-gray-400 mt-3 leading-relaxed">删除分类不会删除金句，该分类下的金句会变为「未分类」。</p>
+          <p className="text-[10px] text-gray-400 mt-3 leading-relaxed">删除分类不会删除金句，该分类会从相关金句中移除。</p>
         </div>
       </div>
     </div>
   );
 }
 
-// ── AI 一键分类预览弹窗 ──
-function AiClassifyDialog({ loading, saving, suggestions, newCats, existingCats, onChange, onClose, onSave }: {
+// ── AI 一键分类预览弹窗（多选） ──
+function AiClassifyDialog({ loading, saving, suggestions, newCats, existingCats, onToggle, onClose, onSave }: {
   loading: boolean; saving: boolean;
   suggestions: Suggestion[]; newCats: string[]; existingCats: string[];
-  onChange: (id: string, category: string) => void;
+  onToggle: (id: string, category: string, checked: boolean) => void;
   onClose: () => void; onSave: () => void;
 }) {
-  // 全部可选分类 = 已有 + AI 新建
   const allCats = Array.from(new Set([...existingCats, ...newCats]));
-  // 按建议分类归组展示
-  const grouped = useMemo(() => {
-    const m = new Map<string, Suggestion[]>();
-    for (const s of suggestions) {
-      const k = s.category || "未分类";
-      if (!m.has(k)) m.set(k, []);
-      m.get(k)!.push(s);
-    }
-    return Array.from(m.entries());
-  }, [suggestions]);
-  const changedCount = suggestions.filter((s) => (s.category || "") !== (s.oldCategory || "")).length;
+  const changedCount = suggestions.filter((s) => {
+    const a = [...s.categories].sort();
+    const b = [...s.oldCategories].sort();
+    return JSON.stringify(a) !== JSON.stringify(b);
+  }).length;
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
@@ -416,7 +464,7 @@ function AiClassifyDialog({ loading, saving, suggestions, newCats, existingCats,
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
           <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-violet-500" /> AI 分类建议
-            {!loading && <span className="text-[10px] font-normal text-gray-400">（可逐条调整后保存）</span>}
+            {!loading && <span className="text-[10px] font-normal text-gray-400">（可勾选调整后保存）</span>}
           </h3>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
         </div>
@@ -436,29 +484,30 @@ function AiClassifyDialog({ loading, saving, suggestions, newCats, existingCats,
                   将新增分类：{newCats.join("、")}
                 </div>
               )}
-              <div className="space-y-4">
-                {grouped.map(([cat, items]) => (
-                  <div key={cat}>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: categoryColor(cat) }} />
-                      <span className="text-xs font-medium text-gray-700">{cat}</span>
-                      <span className="text-[10px] text-gray-400">({items.length})</span>
+              <div className="space-y-3">
+                {suggestions.map((s) => (
+                  <div key={s.id} className="px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-100">
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-gray-700 line-clamp-2">“{s.content}”</div>
+                        {s.sourceTitle && <div className="text-[10px] text-gray-400 mt-0.5 truncate">来源：{s.sourceTitle}</div>}
+                      </div>
                     </div>
-                    <div className="space-y-1.5">
-                      {items.map((s) => (
-                        <div key={s.id} className="flex items-start gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100">
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs text-gray-700 line-clamp-2">“{s.content}”</div>
-                            {s.sourceTitle && <div className="text-[10px] text-gray-400 mt-0.5 truncate">来源：{s.sourceTitle}</div>}
-                          </div>
-                          <select value={s.category} onChange={(e) => onChange(s.id, e.target.value)}
-                            className="text-[11px] border border-gray-200 rounded px-1.5 py-1 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-violet-400/40 flex-shrink-0">
-                            {!allCats.includes(s.category) && s.category && <option value={s.category}>{s.category}（新）</option>}
-                            {allCats.map((c) => <option key={c} value={c}>{c}</option>)}
-                            <option value="">未分类</option>
-                          </select>
-                        </div>
-                      ))}
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {allCats.length === 0 ? (
+                        <span className="text-[10px] text-gray-400">暂无可用分类</span>
+                      ) : (
+                        allCats.map((c) => {
+                          const checked = s.categories.includes(c);
+                          return (
+                            <button key={c} onClick={() => onToggle(s.id, c, !checked)}
+                              className={`flex items-center gap-1 px-2 py-1 text-[10px] rounded-full border transition-colors ${checked ? "border-amber-300 bg-amber-50 text-amber-700" : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"}`}>
+                              {checked ? <CheckSquare className="w-3 h-3" /> : <Square className="w-3 h-3" />}
+                              {c}
+                            </button>
+                          );
+                        })
+                      )}
                     </div>
                   </div>
                 ))}

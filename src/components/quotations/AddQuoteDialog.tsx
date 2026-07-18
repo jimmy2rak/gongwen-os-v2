@@ -45,7 +45,8 @@ export function AddQuoteDialog({
     if (!c) { setErr("金句内容不能为空"); return; }
     setSaving(true);
     setErr(null);
-    const r = await addQuote({ content: c, sourceType, sourceId, sourceTitle, category: category.trim() });
+    const categories = category.split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+    const r = await addQuote({ content: c, sourceType, sourceId, sourceTitle, category: categories.length ? categories : "" });
     setSaving(false);
     if (r.success) {
       onAdded?.();
@@ -80,12 +81,12 @@ export function AddQuoteDialog({
           placeholder="选中的文字将自动填入，可手动调整"
         />
 
-        <label className="block text-[11px] text-gray-500 mb-1 mt-3">分类（可选）</label>
+        <label className="block text-[11px] text-gray-500 mb-1 mt-3">分类（可选，多个用逗号分隔）</label>
         <input
           value={category}
           onChange={(e) => setCategory(e.target.value)}
           className="w-full text-sm text-gray-800 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-amber-300"
-          placeholder="如：乡村振兴 / 基层治理 / 工作作风"
+          placeholder="如：乡村振兴，工作作风"
         />
 
         {sourceTitle && (
