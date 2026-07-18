@@ -7,6 +7,7 @@ export { sessions } from "./sessions";
 export { documents } from "./documents";
 export { versions } from "./versions";
 export { quotations } from "./quotations";
+export { quoteCategories } from "./quote-categories";
 export { apiKeys } from "./apiKeys";
 export { skills } from "./skills";
 export { templates } from "./templates";

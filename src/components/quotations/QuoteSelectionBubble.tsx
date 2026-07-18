@@ -23,41 +23,56 @@ export function QuoteSelectionBubble() {
   const hide = useCallback(() => { setBubble(null); bubbleRef.current = null; }, []);
 
   useEffect(() => {
-    const handler = () => {
-      // 延迟到 selection 稳定后再读取
-      window.setTimeout(() => {
-        const sel = window.getSelection();
-        if (!sel || sel.isCollapsed || sel.rangeCount === 0) { hide(); return; }
-        const text = sel.toString().trim();
-        if (!text || text.length < 2) { hide(); return; }
-        const anchorEl = (sel.anchorNode as HTMLElement | null)?.parentElement
-          || (sel.anchorNode as any)?.parentElement;
-        if (!anchorEl) { hide(); return; }
-        const article = anchorEl.closest("[data-gw-article]") as HTMLElement | null;
-        if (!article) { hide(); return; }
-        if (anchorEl.closest('[contenteditable="true"]')) { hide(); return; }
-        const rect = sel.getRangeAt(0).getBoundingClientRect();
-        if (rect.width === 0 && rect.height === 0) { hide(); return; }
-        const top = Math.min(rect.top - 44, (typeof window !== "undefined" ? window.innerHeight : 800) - 44);
-        const state: BubbleState = {
-          text,
-          top: top < 8 ? rect.bottom + 8 : top,
-          left: Math.min(Math.max(rect.left + rect.width / 2 - 50, 8), (typeof window !== "undefined" ? window.innerWidth : 800) - 120),
-          sourceType: article.dataset.gwSourceType || "manual",
-          sourceId: article.dataset.gwSourceId || "",
-          sourceTitle: article.dataset.gwSourceTitle || "",
-        };
-        bubbleRef.current = state;
-        setBubble(state);
-      }, 10);
+    // 读取当前选区并决定是否显示气泡（桌面/移动端通用）
+    const evaluate = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) { hide(); return; }
+      const text = sel.toString().trim();
+      if (!text || text.length < 2) { hide(); return; }
+      // anchorNode 可能是文本节点，取其父元素定位所属文章容器
+      const anchorNode = sel.anchorNode;
+      const anchorEl = (anchorNode?.nodeType === 1 ? anchorNode : anchorNode?.parentElement) as HTMLElement | null;
+      if (!anchorEl) { hide(); return; }
+      const article = anchorEl.closest("[data-gw-article]") as HTMLElement | null;
+      if (!article) { hide(); return; }
+      if (anchorEl.closest('[contenteditable="true"]')) { hide(); return; }
+      const rect = sel.getRangeAt(0).getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) { hide(); return; }
+      const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+      const vw = typeof window !== "undefined" ? window.innerWidth : 800;
+      const top = Math.min(rect.top - 44, vh - 44);
+      const state: BubbleState = {
+        text,
+        top: top < 8 ? rect.bottom + 8 : top,
+        left: Math.min(Math.max(rect.left + rect.width / 2 - 50, 8), vw - 120),
+        sourceType: article.dataset.gwSourceType || "manual",
+        sourceId: article.dataset.gwSourceId || "",
+        sourceTitle: article.dataset.gwSourceTitle || "",
+      };
+      bubbleRef.current = state;
+      setBubble(state);
     };
-    document.addEventListener("mouseup", handler);
-    document.addEventListener("touchend", handler);
-    // 滚动/重新选择时隐藏
+
+    // 防抖：移动端拖动选区手柄会连续触发 selectionchange，等稳定后再读取
+    let debTimer: number | undefined;
+    const onSelectionChange = () => {
+      if (debTimer) window.clearTimeout(debTimer);
+      debTimer = window.setTimeout(evaluate, 300);
+    };
+    // 指针抬起后立即再确认一次（桌面鼠标 / 移动端点按）
+    const onPointerUp = () => { window.setTimeout(evaluate, 20); };
+
+    // selectionchange 是移动端最可靠的主检测；mouseup/touchend 作为即时补充
+    document.addEventListener("selectionchange", onSelectionChange);
+    document.addEventListener("mouseup", onPointerUp);
+    document.addEventListener("touchend", onPointerUp);
+    // 滚动时隐藏（移动端选区手柄拖动会伴随滚动，但 selectionchange 会重新评估）
     window.addEventListener("scroll", hide, true);
     return () => {
-      document.removeEventListener("mouseup", handler);
-      document.removeEventListener("touchend", handler);
+      if (debTimer) window.clearTimeout(debTimer);
+      document.removeEventListener("selectionchange", onSelectionChange);
+      document.removeEventListener("mouseup", onPointerUp);
+      document.removeEventListener("touchend", onPointerUp);
       window.removeEventListener("scroll", hide, true);
     };
   }, [hide]);

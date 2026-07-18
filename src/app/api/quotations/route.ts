@@ -55,6 +55,45 @@ export async function DELETE(req: NextRequest) {
   }
 }
 
+// PATCH: 批量/单条修改分类。
+// 支持三种载荷：
+//   { items: [{id, category}, ...] }  —— AI 一键分类保存
+//   { ids: [...], category }          —— 批量设为同一分类
+//   { id, category }                  —— 单条改分类
+export async function PATCH(req: NextRequest) {
+  const user = await getServerUser();
+  if (!user) return unauthorized();
+  let body: any;
+  try { body = await req.json(); } catch { body = {}; }
+  const now = Math.floor(Date.now() / 1000);
+  try {
+    let updates: { id: string; category: string }[] = [];
+    if (Array.isArray(body.items)) {
+      updates = body.items
+        .filter((it: any) => it && typeof it.id === "string")
+        .map((it: any) => ({ id: it.id, category: typeof it.category === "string" ? it.category : "" }));
+    } else if (Array.isArray(body.ids)) {
+      const category = typeof body.category === "string" ? body.category : "";
+      updates = body.ids.filter((x: any) => typeof x === "string").map((id: string) => ({ id, category }));
+    } else if (typeof body.id === "string") {
+      updates = [{ id: body.id, category: typeof body.category === "string" ? body.category : "" }];
+    }
+    if (updates.length === 0) {
+      return NextResponse.json({ success: false, error: { message: "缺少要更新的金句" } }, { status: 400 });
+    }
+    for (const u of updates) {
+      await client.execute({
+        sql: `UPDATE quotations SET category = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+        args: [u.category, now, u.id, user.id],
+      });
+    }
+    return NextResponse.json({ success: true, updated: updates.length });
+  } catch (e) {
+    console.error("[quotations PATCH]", e);
+    return NextResponse.json({ success: false, error: { message: "更新失败" } }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   const user = await getServerUser();
   if (!user) return unauthorized();

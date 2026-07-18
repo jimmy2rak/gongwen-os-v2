@@ -100,35 +100,46 @@ const QUOTE_SCRIPT = `
       if(target){ target.scrollIntoView({behavior:'smooth', block:'center'}); target.classList.add('gw-locate-flash'); setTimeout(function(){ target.classList.remove('gw-locate-flash'); }, 1700); }
     }
   }
-  document.addEventListener('mouseup', function(){
-    setTimeout(function(){
-      var sel = window.getSelection();
-      if(!sel || sel.isCollapsed || sel.rangeCount===0) return;
-      var text = sel.toString().trim();
-      if(!text || text.length<2) return;
-      var range = sel.getRangeAt(0);
-      var rect = range.getBoundingClientRect();
-      if(rect.width===0 && rect.height===0) return;
-      var bubble = document.getElementById('gw-bubble');
-      if(!bubble){
-        bubble = document.createElement('div');
-        bubble.id='gw-bubble';
-        bubble.style.cssText='position:fixed;z-index:9999;display:flex;align-items:center;gap:4px;padding:4px 8px;font-size:12px;color:#fff;background:#f59e0b;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.25);cursor:pointer';
-        bubble.innerHTML='✦ 添加金句';
-        document.body.appendChild(bubble);
-      }
-      var top = rect.top - 36; if(top<8) top = rect.bottom + 8;
-      bubble.style.top = top + 'px';
-      bubble.style.left = Math.min(Math.max(rect.left + rect.width/2 - 40, 8), (window.innerWidth||800)-100) + 'px';
-      bubble.onmousedown = function(e){ e.preventDefault(); };
-      bubble.onclick = function(){
-        parent.postMessage({ type:'gw-add-quote', text: text, sourceId: window.__GW_SRC__ ? window.__GW_SRC__.id : '', sourceTitle: window.__GW_SRC__ ? window.__GW_SRC__.title : '' }, '*');
-        bubble.style.display='none';
-      };
-      bubble.style.display='flex';
-    }, 10);
+  // 读取当前选区并浮出「添加金句」气泡（桌面/移动端通用）
+  function showBubble(){
+    var sel = window.getSelection();
+    if(!sel || sel.isCollapsed || sel.rangeCount===0){ hideBubble(); return; }
+    var text = sel.toString().trim();
+    if(!text || text.length<2){ hideBubble(); return; }
+    var range = sel.getRangeAt(0);
+    var rect = range.getBoundingClientRect();
+    if(rect.width===0 && rect.height===0){ hideBubble(); return; }
+    var bubble = document.getElementById('gw-bubble');
+    if(!bubble){
+      bubble = document.createElement('div');
+      bubble.id='gw-bubble';
+      bubble.style.cssText='position:fixed;z-index:9999;display:flex;align-items:center;gap:4px;padding:6px 10px;font-size:13px;color:#fff;background:#f59e0b;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.25);cursor:pointer;-webkit-user-select:none;user-select:none';
+      bubble.innerHTML='✦ 添加金句';
+      document.body.appendChild(bubble);
+    }
+    var top = rect.top - 40; if(top<8) top = rect.bottom + 8;
+    bubble.style.top = top + 'px';
+    bubble.style.left = Math.min(Math.max(rect.left + rect.width/2 - 40, 8), (window.innerWidth||800)-100) + 'px';
+    // 用捕获的 text，避免移动端点按气泡时选区已折叠
+    bubble.onmousedown = function(e){ e.preventDefault(); };
+    bubble.ontouchstart = function(e){ e.preventDefault(); };
+    var send = function(){
+      parent.postMessage({ type:'gw-add-quote', text: text, sourceId: window.__GW_SRC__ ? window.__GW_SRC__.id : '', sourceTitle: window.__GW_SRC__ ? window.__GW_SRC__.title : '' }, '*');
+      hideBubble();
+    };
+    bubble.onclick = send;
+    bubble.style.display='flex';
+  }
+  function hideBubble(){ var b=document.getElementById('gw-bubble'); if(b) b.style.display='none'; }
+  // selectionchange 是移动端最可靠的主检测（长按+拖动手柄）；防抖等选区稳定
+  var selTimer=null;
+  document.addEventListener('selectionchange', function(){
+    if(selTimer) clearTimeout(selTimer);
+    selTimer = setTimeout(showBubble, 300);
   });
-  document.addEventListener('selectionchange', function(){ var s=window.getSelection(); if(s && s.isCollapsed){ var b=document.getElementById('gw-bubble'); if(b) b.style.display='none'; } });
+  // 指针抬起后即时补充确认
+  document.addEventListener('mouseup', function(){ setTimeout(showBubble, 20); });
+  document.addEventListener('touchend', function(){ setTimeout(showBubble, 20); });
   if(document.readyState!=='loading') apply(); else document.addEventListener('DOMContentLoaded', apply);
 })();
 `;

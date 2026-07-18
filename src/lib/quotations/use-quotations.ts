@@ -64,5 +64,39 @@ export function useQuotations(sourceId?: string) {
     }
   }, []);
 
-  return { quotes, loading, load, addQuote, deleteQuote };
+  /** 单条改分类（乐观更新本地状态） */
+  const setQuoteCategory = useCallback(async (id: string, category: string) => {
+    setQuotes((q) => q.map((x) => (x.id === id ? { ...x, category } : x)));
+    try {
+      const r = await fetch("/api/quotations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, category }),
+      });
+      return await r.json();
+    } catch (e) {
+      return { success: false, error: { message: "网络错误" } };
+    }
+  }, []);
+
+  /** 批量保存分类建议（AI 一键分类）：items=[{id, category}] */
+  const applyCategories = useCallback(async (items: { id: string; category: string }[]) => {
+    try {
+      const r = await fetch("/api/quotations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      });
+      const b = await r.json();
+      if (b.success) {
+        const map = new Map(items.map((it) => [it.id, it.category]));
+        setQuotes((q) => q.map((x) => (map.has(x.id) ? { ...x, category: map.get(x.id)! } : x)));
+      }
+      return b;
+    } catch (e) {
+      return { success: false, error: { message: "网络错误" } };
+    }
+  }, []);
+
+  return { quotes, loading, load, addQuote, deleteQuote, setQuoteCategory, applyCategories };
 }

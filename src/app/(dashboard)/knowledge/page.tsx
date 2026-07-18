@@ -14,13 +14,14 @@ import { ExportMenu } from "@/components/editor/ExportMenu";
 import { ImportDocxModal } from "@/components/editor/ImportDocxModal";
 import { CustomDialog } from "@/components/ui/CustomDialog";
 import { AddQuoteDialog } from "@/components/quotations/AddQuoteDialog";
+import { QuoteLibrary } from "@/components/quotations/QuoteLibrary";
 import { useQuotations } from "@/lib/quotations/use-quotations";
 import { useQuotationStore } from "@/stores/quotation.store";
 import Link from "next/link";
 import {
-  BookOpen, FileText, XCircle, Search, Filter,
-  ExternalLink, Trash2, Clock, UserCheck, Eye, MessageSquare, FileUp,
-  Quote as QuoteIcon, Plus, ChevronDown, MapPin,
+  BookOpen, XCircle, Search,
+  ExternalLink, Clock, UserCheck, Eye, MessageSquare, FileUp,
+  Quote as QuoteIcon, Plus, ChevronDown,
 } from "lucide-react";
 import { KnowledgeChat } from "@/components/ai/KnowledgeChat";
 import { getAllCategories, getCategoryColor } from "@/types";
@@ -61,7 +62,7 @@ export default function KnowledgePage() {
   const allCats = getAllCategories();
 
   // 金句（全部）
-  const { quotes, loading: quotesLoading, deleteQuote } = useQuotations();
+  const { quotes, loading: quotesLoading, deleteQuote, setQuoteCategory, applyCategories, load: reloadQuotes } = useQuotations();
 
   const showToast = (type: "success" | "error", msg: string) => {
     setToast({ type, msg });
@@ -346,50 +347,17 @@ export default function KnowledgePage() {
             )}
           </>
         ) : (
-          /* ── 金句库视图 ── */
-          <>
-            {quotesLoading ? (
-              <div className="text-center py-16 text-sm text-gray-400">加载中...</div>
-            ) : quotes.length === 0 ? (
-              <div className="text-center py-16 bg-gray-50/80 rounded-xl border border-dashed border-gray-200">
-                <QuoteIcon className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-                <p className="text-sm text-gray-400">金句库为空</p>
-                <p className="text-xs text-gray-300 mt-1">在文档/热点中选中文字可添加金句，或点击右上角「手动录入」</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {quotes.map((q) => (
-                  <div key={q.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-[#e7e2d8] hover:shadow-sm transition-shadow group">
-                    <div className="w-1 h-10 rounded-full flex-shrink-0 bg-amber-400" />
-                    <div className="flex-1 min-w-0">
-                      <div
-                        className="text-sm text-gray-800 leading-relaxed cursor-pointer line-clamp-2"
-                        onClick={() => handleLocate(q)}
-                        title="点击定位到原文档"
-                      >
-                        “{q.content}”
-                      </div>
-                      <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-400 flex-wrap">
-                        {q.sourceTitle && <span className="flex items-center gap-1"><FileText className="w-2.5 h-2.5" />{q.sourceTitle}</span>}
-                        {q.category && <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-600">{q.category}</span>}
-                        <span>{new Date(q.createdAt * 1000).toLocaleDateString("zh-CN")}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <button onClick={() => handleLocate(q)} title="定位原文档"
-                        className="p-1.5 rounded text-gray-400 hover:text-[#163f3a] hover:bg-[#163f3a]/5">
-                        <MapPin className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => doDeleteQuote(q.id)} title="删除金句"
-                        className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
+          /* ── 金句库视图（按文章归口 + 分类管理 + AI 一键分类）── */
+          <QuoteLibrary
+            quotes={quotes}
+            loading={quotesLoading}
+            onDelete={doDeleteQuote}
+            onLocate={handleLocate}
+            onSetCategory={setQuoteCategory}
+            onApplyCategories={applyCategories}
+            onReloadQuotes={reloadQuotes}
+            showToast={showToast}
+          />
         )}
 
         {/* Toast */}
